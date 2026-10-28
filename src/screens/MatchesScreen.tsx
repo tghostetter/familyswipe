@@ -5,20 +5,25 @@ import { RecipeDetail } from '../components/RecipeDetail';
 import { likersOf, matchedRecipeIds, MATCH_RULES, MIN_LIKERS } from '../logic/matching';
 import { useStore } from '../state/store';
 import { colors, radius } from '../theme';
+import { plannedIds } from '../logic/plan';
 import { DAYS, Recipe } from '../types';
 
 export function MatchesScreen() {
   const { state, dispatch } = useStore();
   const [open, setOpen] = useState<Recipe | null>(null);
   const ids = matchedRecipeIds(state);
-  const planned = new Set(Object.values(state.plan));
+  const planned = new Set(plannedIds(state.plan));
   const rule = MATCH_RULES.find((r) => r.value === state.matchRule);
 
-  const addToPlan = (id: string) => {
-    const day = DAYS.find((d) => !state.plan[d]);
-    if (day) dispatch({ type: 'setPlanDay', day, recipeId: id });
+  // Puts the recipe on the first free day for its meal (dinner, unless it's a breakfast or lunch).
+  const addToPlan = (r: Recipe) => {
+    const slot = r.mealType ?? 'dinner';
+    const day = DAYS.find((d) => !state.plan[d][slot]);
+    if (!day) return;
+    if (!state.planSlots.includes(slot)) dispatch({ type: 'setPlanSlots', slots: [...state.planSlots, slot] });
+    dispatch({ type: 'setPlanMeal', day, slot, recipeId: r.id });
   };
-  const weekFull = DAYS.every((d) => state.plan[d]);
+  const weekFull = (r: Recipe) => DAYS.every((d) => state.plan[d][r.mealType ?? 'dinner']);
 
   return (
     <View style={{ flex: 1 }}>
@@ -42,6 +47,7 @@ export function MatchesScreen() {
         renderItem={({ item: id }) => {
           const r = state.recipes[id];
           const isPlanned = planned.has(id);
+          const full = !isPlanned && weekFull(r);
           return (
             <Pressable style={styles.row} onPress={() => setOpen(r)}>
               <Image source={r.image} style={styles.thumb} contentFit="cover" />
@@ -52,12 +58,12 @@ export function MatchesScreen() {
                 <Text style={styles.likers}>{likersOf(state, id).map((m) => m.avatar).join(' ')}</Text>
               </View>
               <Pressable
-                disabled={isPlanned || weekFull}
-                onPress={() => addToPlan(id)}
-                style={[styles.add, (isPlanned || weekFull) && styles.addDisabled]}
+                disabled={isPlanned || full}
+                onPress={() => addToPlan(r)}
+                style={[styles.add, (isPlanned || full) && styles.addDisabled]}
               >
-                <Text style={[styles.addText, (isPlanned || weekFull) && { color: colors.muted }]}>
-                  {isPlanned ? 'Planned' : weekFull ? 'Week full' : 'Add'}
+                <Text style={[styles.addText, (isPlanned || full) && { color: colors.muted }]}>
+                  {isPlanned ? 'Planned' : full ? 'Week full' : 'Add'}
                 </Text>
               </Pressable>
             </Pressable>

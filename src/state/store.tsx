@@ -3,6 +3,7 @@ import { createContext, ReactNode, useCallback, useContext, useEffect, useReduce
 import { AppState as RNAppState } from 'react-native';
 import { matchedRecipeIds } from '../logic/matching';
 import { withPrefs } from '../logic/preferences';
+import { autofill, emptyPlan, moveMeal, normalizePlan, setMeal } from '../logic/plan';
 import {
   createHousehold,
   fetchFamily,
@@ -13,13 +14,10 @@ import {
   subscribeToFamily,
 } from '../sync/household';
 import { syncEnabled } from '../sync/supabase';
-import { AppState, Day, DAYS, MatchRule, Member, Recipe, Vote } from '../types';
+import { AppState, Day, ExtraGrocery, MEAL_SLOTS, MatchRule, MealSlot, Member, Recipe, Vote } from '../types';
 
 const STORAGE_KEY = 'familyswipe.v1';
 const DEVICE_KEY = 'familyswipe.device.v1';
-
-const emptyPlan = (): Record<Day, string | null> =>
-  Object.fromEntries(DAYS.map((d) => [d, null])) as Record<Day, string | null>;
 
 export const initialState: AppState = {
   members: [],
@@ -28,7 +26,9 @@ export const initialState: AppState = {
   recipes: {},
   deckOrder: [],
   plan: emptyPlan(),
+  planSlots: ['dinner'],
   checkedGroceries: [],
+  extraGroceries: [],
 };
 
 export type Action =
@@ -41,9 +41,14 @@ export type Action =
   | { type: 'undoVote'; memberId: string; recipeId: string }
   | { type: 'addRecipes'; recipes: Recipe[] }
   | { type: 'importRecipe'; recipe: Recipe }
-  | { type: 'setPlanDay'; day: Day; recipeId: string | null }
+  | { type: 'setPlanMeal'; day: Day; slot: MealSlot; recipeId: string | null }
+  | { type: 'movePlanMeal'; slot: MealSlot; from: Day; to: Day }
   | { type: 'autofillPlan' }
+  | { type: 'clearPlan' }
+  | { type: 'setPlanSlots'; slots: MealSlot[] }
   | { type: 'toggleGrocery'; key: string }
+  | { type: 'addExtraGrocery'; item: ExtraGrocery }
+  | { type: 'removeExtraGrocery'; id: string }
   | { type: 'newWeek' };
 
 export function reducer(state: AppState, action: Action): AppState {
@@ -53,7 +58,7 @@ export function reducer(state: AppState, action: Action): AppState {
         ...initialState,
         ...action.state,
         members: (action.state.members ?? []).map(withPrefs),
-        plan: { ...emptyPlan(), ...action.state.plan },
+        plan: normalizePlan(action.state.plan),
       };
     case 'addMember':
       return { ...state, members: [...state.members, action.member] };
@@ -98,25 +103,31 @@ export function reducer(state: AppState, action: Action): AppState {
         deckOrder: [recipe.id, ...state.deckOrder.filter((id) => id !== recipe.id)],
       };
     }
-    case 'setPlanDay':
-      return { ...state, plan: { ...state.plan, [action.day]: action.recipeId } };
+    case 'setPlanMeal':
+      return { ...state, plan: setMeal(state.plan, action.day, action.slot, action.recipeId) };
+    case 'movePlanMeal':
+      return { ...state, plan: moveMeal(state.plan, action.slot, action.from, action.to) };
     case 'autofillPlan': {
-      const planned = new Set(Object.values(state.plan).filter(Boolean));
-      const unplanned = matchedRecipeIds(state).filter((id) => !planned.has(id));
-      const plan = { ...state.plan };
-      for (const day of DAYS) {
-        if (!plan[day] && unplanned.length) plan[day] = unplanned.shift()!;
-      }
-      return { ...state, plan };
+      const matches = matchedRecipeIds(state).map((id) => state.recipes[id]);
+      return { ...state, plan: autofill(state.plan, state.planSlots, matches) };
     }
+    case 'clearPlan':
+      return { ...state, plan: emptyPlan() };
+    case 'setPlanSlots':
+      // Keep them in breakfast, lunch, dinner order.
+      return { ...state, planSlots: MEAL_SLOTS.filter((s) => action.slots.includes(s)) };
     case 'toggleGrocery': {
       const checked = new Set(state.checkedGroceries);
       checked.has(action.key) ? checked.delete(action.key) : checked.add(action.key);
       return { ...state, checkedGroceries: [...checked] };
     }
+    case 'addExtraGrocery':
+      return { ...state, extraGroceries: [...state.extraGroceries.filter((i) => i.id !== action.item.id), action.item] };
+    case 'removeExtraGrocery':
+      return { ...state, extraGroceries: state.extraGroceries.filter((i) => i.id !== action.id) };
     case 'newWeek':
-      // Keep the family, start fresh votes, deck, plan and list.
-      return { ...initialState, members: state.members, matchRule: state.matchRule };
+      // Keep the family and which meals they plan, start fresh votes, deck, plan and list.
+      return { ...initialState, members: state.members, matchRule: state.matchRule, planSlots: state.planSlots };
   }
 }
 

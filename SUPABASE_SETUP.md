@@ -23,6 +23,8 @@ Until you do this, the app keeps working the old way, on one shared phone.
 3. Paste it into the SQL Editor and click **Run** (bottom right).
 4. You should see "Success. No rows returned". (It's safe to run it again later if you need to.)
 
+**When the app gets a new version:** if `supabase/schema.sql` changed, repeat these steps so the database gets the new tables. Running it again keeps your family, swipes and plan. (For example, the weekly planner with breakfast and lunch and the shopping list's own items need this.)
+
 ## 3. Turn on "anonymous" sign-ins
 
 This is what lets kids join without an email address.
