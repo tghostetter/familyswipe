@@ -1,11 +1,12 @@
 import { Action, initialState } from '../state/store';
+import { readPrefs } from '../logic/preferences';
 import { AppState, Day, DAYS, MatchRule, Member, Recipe, Vote } from '../types';
 import { ensureSignedIn, supabase } from './supabase';
 
 export type Household = { id: string; name: string; inviteCode: string };
 
 type HouseholdRow = { id: string; name: string; invite_code: string; match_rule: MatchRule };
-type MemberRow = { id: string; name: string; avatar: string; is_kid: boolean; no_foods: string[] };
+type MemberRow = { id: string; name: string; avatar: string; is_kid: boolean; no_foods: string[]; prefs: unknown };
 type VoteRow = { member_id: string; recipe_id: string; vote: Vote };
 
 function db() {
@@ -27,6 +28,7 @@ const memberRow = (householdId: string, m: Member) => ({
   avatar: m.avatar,
   is_kid: m.isKid,
   no_foods: m.noFoods,
+  prefs: m.prefs,
 });
 
 /** Shows a code like "XP5 59S" so it is easier to read out loud. */
@@ -61,7 +63,7 @@ export async function fetchFamily(householdId: string): Promise<{ household: Hou
   const s = db();
   const [h, members, recipes, votes, planDays, groceries] = await Promise.all([
     s.from('households').select('id, name, invite_code, match_rule').eq('id', householdId).single<HouseholdRow>(),
-    s.from('members').select('id, name, avatar, is_kid, no_foods').eq('household_id', householdId).order('created_at'),
+    s.from('members').select('id, name, avatar, is_kid, no_foods, prefs').eq('household_id', householdId).order('created_at'),
     s.from('recipes').select('id, data').eq('household_id', householdId).order('position').order('created_at'),
     s.from('votes').select('member_id, recipe_id, vote').eq('household_id', householdId),
     s.from('plan_days').select('day, recipe_id').eq('household_id', householdId),
@@ -78,6 +80,7 @@ export async function fetchFamily(householdId: string): Promise<{ household: Hou
       avatar: m.avatar,
       isKid: m.is_kid,
       noFoods: m.no_foods,
+      prefs: readPrefs(m.prefs),
     })),
     recipes: {},
     deckOrder: [],

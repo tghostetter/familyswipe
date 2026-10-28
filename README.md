@@ -23,7 +23,7 @@ Changes to the code show up on the phone right away while `npx expo start` is ru
 
 | Tab | What it does |
 | --- | --- |
-| Family | Shows your family code for adding phones and tablets. Add family members, mark kids, pick avatars, list foods someone never eats, choose what counts as a match, start a new week |
+| Family | Shows your family code for adding phones and tablets. Add family members, mark kids, pick avatars, set each person's food preferences (favorite dinners and cuisines, meats and other foods they never eat), choose what counts as a match, start a new week |
 | Swipe | Tap your name (each device remembers you), then swipe right (yum) or left (nope). Kids get big photos and Yum / Yuck buttons. Tap a card to see the recipe |
 | Matches | Dinners the family agreed on. "Add" puts one on the next empty night |
 | Plan | Monday to Sunday. "Fill empty nights" uses your matches |

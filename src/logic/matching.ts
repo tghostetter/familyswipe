@@ -1,4 +1,5 @@
 import { AppState, MatchRule, Member, Recipe } from '../types';
+import { familyScore, hasSkippedMeat } from './preferences';
 
 export const MATCH_RULES: { value: MatchRule; label: string; help: string }[] = [
   { value: 'everyone', label: 'Everyone', help: 'A match needs a "yum" from every family member.' },
@@ -43,6 +44,7 @@ export function isMatch(
 
 /** True when the recipe uses something any family member never eats. */
 export function isBlocked(members: Member[], recipe: Recipe): boolean {
+  if (members.some((m) => hasSkippedMeat(m.prefs, recipe))) return true;
   const noFoods = members.flatMap((m) => m.noFoods.map((f) => f.trim().toLowerCase())).filter(Boolean);
   if (noFoods.length === 0) return false;
   const haystack = [recipe.name, ...recipe.ingredients.map((i) => i.name)].join(' ').toLowerCase();
@@ -55,10 +57,13 @@ export function matchedRecipeIds(state: AppState): string[] {
   );
 }
 
-/** Recipes this member hasn't voted on yet. */
+/** Recipes this member hasn't voted on yet, the ones the family loves most first. */
 export function deckFor(state: AppState, memberId: string): Recipe[] {
   const mine = state.votes[memberId] ?? {};
   return state.deckOrder
     .map((id) => state.recipes[id])
-    .filter((r): r is Recipe => !!r && !mine[r.id] && !isBlocked(state.members, r));
+    .filter((r): r is Recipe => !!r && !mine[r.id] && !isBlocked(state.members, r))
+    .map((r) => ({ r, score: familyScore(state.members, r) }))
+    .sort((a, b) => b.score - a.score)
+    .map(({ r }) => r);
 }
