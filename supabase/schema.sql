@@ -7,8 +7,9 @@
 --   members            the people in the family (Mom, Grandpa, Jake...)
 --   recipes            this week's deck of dinners
 --   votes              each person's yum / nope on each recipe
---   plan_days          Monday to Sunday
+--   plan_meals         breakfast, lunch and dinner for Monday to Sunday
 --   grocery_checks     grocery items someone has checked off
+--   grocery_extras     things added to the shopping list by hand (milk, paper towels...)
 -- A device can only read or change the family it joined (row level security).
 
 create extension if not exists pgcrypto;
@@ -72,6 +73,34 @@ create table if not exists public.plan_days (
   primary key (household_id, day)
 );
 
+-- Which meals the family plans each day. Added after the first version, so it's added separately.
+alter table public.households add column if not exists plan_slots text[] not null default '{dinner}';
+alter table public.households drop constraint if exists households_plan_slots_check;
+alter table public.households add constraint households_plan_slots_check
+  check (plan_slots <@ array['breakfast', 'lunch', 'dinner']);
+
+create table if not exists public.plan_meals (
+  household_id uuid not null references public.households on delete cascade,
+  day text not null check (day in ('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun')),
+  slot text not null check (slot in ('breakfast', 'lunch', 'dinner')),
+  recipe_id text,
+  primary key (household_id, day, slot)
+);
+
+-- The first version planned one dinner a day in plan_days. Move those dinners over (only once).
+insert into public.plan_meals (household_id, day, slot, recipe_id)
+  select household_id, day, 'dinner', recipe_id from public.plan_days
+  on conflict do nothing;
+delete from public.plan_days;
+
+create table if not exists public.grocery_extras (
+  household_id uuid not null references public.households on delete cascade,
+  id text not null,
+  name text not null check (length(name) between 1 and 80),
+  created_at timestamptz not null default now(),
+  primary key (household_id, id)
+);
+
 create table if not exists public.grocery_checks (
   household_id uuid not null references public.households on delete cascade,
   key text not null,
@@ -95,6 +124,8 @@ alter table public.members enable row level security;
 alter table public.recipes enable row level security;
 alter table public.votes enable row level security;
 alter table public.plan_days enable row level security;
+alter table public.plan_meals enable row level security;
+alter table public.grocery_extras enable row level security;
 alter table public.grocery_checks enable row level security;
 
 drop policy if exists "family can read" on public.households;
@@ -114,7 +145,7 @@ create policy "leave family" on public.household_devices
 do $$
 declare t text;
 begin
-  foreach t in array array['members', 'recipes', 'votes', 'plan_days', 'grocery_checks'] loop
+  foreach t in array array['members', 'recipes', 'votes', 'plan_days', 'plan_meals', 'grocery_checks', 'grocery_extras'] loop
     execute format('drop policy if exists "family only" on public.%I', t);
     execute format(
       'create policy "family only" on public.%I for all to authenticated
@@ -123,9 +154,9 @@ begin
   end loop;
 end $$;
 
--- Only allow changing the match rule and name from the app; the join code stays fixed.
+-- Only allow changing the name, match rule and planned meals from the app; the join code stays fixed.
 revoke update on public.households from anon, authenticated;
-grant update (name, match_rule) on public.households to authenticated;
+grant update (name, match_rule, plan_slots) on public.households to authenticated;
 
 -- When anything except a vote changes, bump the family's updated_at so other devices reload.
 -- (Votes are sent to other devices one by one instead, because they happen constantly.)
@@ -143,7 +174,7 @@ $$;
 do $$
 declare t text;
 begin
-  foreach t in array array['members', 'recipes', 'plan_days', 'grocery_checks'] loop
+  foreach t in array array['members', 'recipes', 'plan_days', 'plan_meals', 'grocery_checks', 'grocery_extras'] loop
     execute format('drop trigger if exists touch_household on public.%I', t);
     execute format(
       'create trigger touch_household after insert or update or delete on public.%I
@@ -218,7 +249,7 @@ begin
 end;
 $$;
 
--- Clear swipes, the deck, the plan and the grocery list. The family stays.
+-- Clear swipes, the deck, the plan and the shopping list. The family stays.
 create or replace function public.new_week(p_household uuid)
 returns void
 language plpgsql security definer set search_path = public
@@ -230,7 +261,9 @@ begin
   delete from public.votes where household_id = p_household;
   delete from public.recipes where household_id = p_household;
   delete from public.plan_days where household_id = p_household;
+  delete from public.plan_meals where household_id = p_household;
   delete from public.grocery_checks where household_id = p_household;
+  delete from public.grocery_extras where household_id = p_household;
 end;
 $$;
 

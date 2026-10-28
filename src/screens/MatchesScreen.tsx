@@ -5,6 +5,7 @@ import { RecipeDetail } from '../components/RecipeDetail';
 import { likersOf, MATCH_RULES, matchedRecipeIds, MEAL_TYPES, mealTypeOf, MIN_LIKERS, photoFit } from '../logic/matching';
 import { useStore } from '../state/store';
 import { colors, radius } from '../theme';
+import { plannedIds } from '../logic/plan';
 import { DAYS, Recipe } from '../types';
 
 export function MatchesScreen() {
@@ -12,14 +13,18 @@ export function MatchesScreen() {
   const [open, setOpen] = useState<Recipe | null>(null);
   // Matches are kept separate for each meal, so a yum on pancakes never fills a dinner slot.
   const sections = MEAL_TYPES.map((t) => ({ ...t, data: matchedRecipeIds(state, t.value) })).filter((s) => s.data.length > 0);
-  const planned = new Set(Object.values(state.plan));
+  const planned = new Set(plannedIds(state.plan));
   const rule = MATCH_RULES.find((r) => r.value === state.matchRule);
 
-  const addToPlan = (id: string) => {
-    const day = DAYS.find((d) => !state.plan[d]);
-    if (day) dispatch({ type: 'setPlanDay', day, recipeId: id });
+  // Puts the recipe on the first free day for its meal (dinner, unless it's a breakfast or lunch).
+  const addToPlan = (r: Recipe) => {
+    const slot = mealTypeOf(r);
+    const day = DAYS.find((d) => !state.plan[d][slot]);
+    if (!day) return;
+    if (!state.planSlots.includes(slot)) dispatch({ type: 'setPlanSlots', slots: [...state.planSlots, slot] });
+    dispatch({ type: 'setPlanMeal', day, slot, recipeId: r.id });
   };
-  const weekFull = DAYS.every((d) => state.plan[d]);
+  const weekFull = (r: Recipe) => DAYS.every((d) => state.plan[d][mealTypeOf(r)]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -49,8 +54,7 @@ export function MatchesScreen() {
         renderItem={({ item: id }) => {
           const r = state.recipes[id];
           const isPlanned = planned.has(id);
-          // The weekly plan only holds dinners for now.
-          const plannable = mealTypeOf(r) === 'dinner';
+          const full = !isPlanned && weekFull(r);
           return (
             <Pressable style={styles.row} onPress={() => setOpen(r)}>
               <Image source={r.image} style={styles.thumb} contentFit={photoFit(r)} />
@@ -60,17 +64,15 @@ export function MatchesScreen() {
                 </Text>
                 <Text style={styles.likers}>{likersOf(state, id).map((m) => m.avatar).join(' ')}</Text>
               </View>
-              {plannable && (
-                <Pressable
-                  disabled={isPlanned || weekFull}
-                  onPress={() => addToPlan(id)}
-                  style={[styles.add, (isPlanned || weekFull) && styles.addDisabled]}
-                >
-                  <Text style={[styles.addText, (isPlanned || weekFull) && { color: colors.muted }]}>
-                    {isPlanned ? 'Planned' : weekFull ? 'Week full' : 'Add'}
-                  </Text>
-                </Pressable>
-              )}
+              <Pressable
+                disabled={isPlanned || full}
+                onPress={() => addToPlan(r)}
+                style={[styles.add, (isPlanned || full) && styles.addDisabled]}
+              >
+                <Text style={[styles.addText, (isPlanned || full) && { color: colors.muted }]}>
+                  {isPlanned ? 'Planned' : full ? 'Week full' : 'Add'}
+                </Text>
+              </Pressable>
             </Pressable>
           );
         }}
