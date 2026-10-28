@@ -8,7 +8,10 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.familyswipe.app"
+      "bundleIdentifier": "com.tghostetter.familyswipe",
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +21,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.familyswipe.app"
+      "package": "com.tghostetter.familyswipe"
     },
     "web": {
       "favicon": "./assets/favicon.png"

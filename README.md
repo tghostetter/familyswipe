@@ -43,4 +43,18 @@ Changes to the code show up on the phone right away while `npx expo start` is ru
 
 - **Recipe key:** TheMealDB's free key ("1") is for development. Get a production key (or switch to Spoonacular) in `src/api/recipes.ts` before launch.
 - **Name and IDs:** pick the final name, then update `name`, `slug`, `ios.bundleIdentifier`, and `android.package` in `app.json`.
-- **Building for the store:** `npx eas-cli@latest build --platform ios` then `npx eas-cli@latest submit --platform ios`, signed in with your Apple Developer account.
+- **Building for the store:** see "Put it on your iPhone with TestFlight" below.
+
+## Put it on your iPhone with TestFlight
+
+TestFlight installs a real copy of the app on your phone, with no computer needed after that. It uses your Apple Developer account.
+
+1. Create a free account at https://expo.dev/signup.
+2. In this folder, run `npx eas-cli@latest login`.
+3. Run `npx eas-cli@latest build --platform ios --profile production --auto-submit`.
+   - Answer yes when it asks to create the project and to sign in to your Apple account.
+   - Let it create the certificates and the App Store Connect app for you.
+4. The build runs in the cloud (about 15 to 30 minutes). Then it uploads to App Store Connect, and Apple processes it (another 10 to 30 minutes).
+5. Install the **TestFlight** app on your iPhone. Sign in with the same Apple ID, and FamilySwipe shows up there.
+
+To add family testers, open App Store Connect, go to your app, then TestFlight, then Internal Testing, and add their Apple IDs.
