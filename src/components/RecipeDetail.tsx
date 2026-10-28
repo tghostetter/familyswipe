@@ -2,8 +2,10 @@ import { Image } from 'expo-image';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { photoFit } from '../logic/matching';
+import { estimateNutrition } from '../logic/nutrition';
 import { colors, radius } from '../theme';
 import { Recipe } from '../types';
+import { NutritionPanel } from './Nutrition';
 
 type Props = { recipe: Recipe | null; onClose: () => void };
 
@@ -18,6 +20,9 @@ export function RecipeDetail({ recipe, onClose }: Props) {
             <View style={styles.body}>
               <Text style={styles.name}>{recipe.name}</Text>
               <Text style={styles.meta}>{[recipe.cuisine, recipe.category].filter(Boolean).join(' · ')}</Text>
+
+              <Text style={styles.h}>Nutrition</Text>
+              <NutritionPanel n={estimateNutrition(recipe)} />
 
               <Text style={styles.h}>Ingredients</Text>
               {recipe.ingredients.map((ing, i) => (

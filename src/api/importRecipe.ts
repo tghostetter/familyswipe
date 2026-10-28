@@ -79,6 +79,8 @@ export function parseRecipeHtml(html: string, url: string): Recipe | null {
     ingredients,
     instructions,
     sourceUrl: url,
+    servings: servingsFrom(node.recipeYield),
+    siteNutrition: nutritionFrom(node.nutrition),
   };
 }
 
@@ -184,7 +186,8 @@ function steps(value: unknown): string[] {
 // Units we split off the front of an ingredient line, so "2 cups flour" becomes "flour" + "2 cups".
 const UNITS =
   'cups?|c\\.|tablespoons?|tbsps?\\.?|tbs\\.?|teaspoons?|tsps?\\.?|ounces?|oz\\.?|fl\\.? oz\\.?|pounds?|lbs?\\.?|grams?|g|kilograms?|kg|milliliters?|millilitres?|ml|liters?|litres?|l|pints?|quarts?|gallons?|cloves?|cans?|jars?|packages?|pkgs?\\.?|sticks?|slices?|pinch(?:es)?|dash(?:es)?|handfuls?|bunch(?:es)?|sprigs?|heads?|stalks?|pieces?|large|medium|small';
-const QTY = '(?:\\d+(?:[.,]\\d+)?|\\d+\\s*\\/\\s*\\d+|[¼½¾⅓⅔⅛⅜⅝⅞])';
+// Fractions first, so "1 1/2" isn't read as "1 1" followed by "/2".
+const QTY = '(?:\\d+\\s*\\/\\s*\\d+|\\d+(?:[.,]\\d+)?|[¼½¾⅓⅔⅛⅜⅝⅞])';
 const INGREDIENT_RE = new RegExp(
   `^((?:${QTY}\\s*)+(?:(?:-|to|–)\\s*(?:${QTY}\\s*)+)?(?:\\([^)]*\\)\\s*)?(?:(?:${UNITS})(?![a-z]))?)\\s*(?:of\\s+)?(.+)$`,
   'i',
@@ -194,6 +197,42 @@ export function splitIngredient(line: string): Ingredient {
   const m = line.match(INGREDIENT_RE);
   if (!m || !m[2]) return { name: line, measure: '' };
   return { name: m[2].trim(), measure: m[1].trim() };
+}
+
+/** "4", "Serves 4", "4-6 servings", ["4", "4 servings"] → 4. */
+function servingsFrom(value: unknown): number | undefined {
+  for (const v of asArray(value)) {
+    const n = Number(text(v).match(/\d+/)?.[0]);
+    if (n >= 1 && n <= 50) return n;
+  }
+  return undefined;
+}
+
+const NUTRITION_FIELDS = {
+  calories: 'calories',
+  protein: 'proteinContent',
+  carbs: 'carbohydrateContent',
+  fat: 'fatContent',
+  satFat: 'saturatedFatContent',
+  sugar: 'sugarContent',
+  fiber: 'fiberContent',
+  sodium: 'sodiumContent',
+} as const;
+
+/** The schema.org NutritionInformation block ("350 kcal", "12 g"...), per serving. */
+function nutritionFrom(value: unknown): Recipe['siteNutrition'] {
+  const node = asArray(value)[0];
+  if (!node || typeof node !== 'object') return undefined;
+  const out: NonNullable<Recipe['siteNutrition']> = {};
+  for (const [ours, theirs] of Object.entries(NUTRITION_FIELDS) as [keyof typeof NUTRITION_FIELDS, string][]) {
+    const raw = text((node as Json)[theirs]);
+    const n = Number(raw.replace(',', '.').match(/\d+(?:\.\d+)?/)?.[0]);
+    if (!raw || !Number.isFinite(n)) continue;
+    // Sodium is usually in milligrams, but some sites give grams.
+    out[ours] = ours === 'sodium' && /\d\s*g\b/i.test(raw) && !/mg/i.test(raw) ? n * 1000 : n;
+  }
+  // Only trust it if it at least has calories.
+  return out.calories ? out : undefined;
 }
 
 // ---- small helpers ----
