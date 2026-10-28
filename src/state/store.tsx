@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useReducer, useRef, useState } from 'react';
 import { AppState as RNAppState } from 'react-native';
 import { matchedRecipeIds } from '../logic/matching';
+import { withPrefs } from '../logic/preferences';
 import {
   createHousehold,
   fetchFamily,
@@ -39,6 +40,7 @@ export type Action =
   | { type: 'vote'; memberId: string; recipeId: string; vote: Vote }
   | { type: 'undoVote'; memberId: string; recipeId: string }
   | { type: 'addRecipes'; recipes: Recipe[] }
+  | { type: 'importRecipe'; recipe: Recipe }
   | { type: 'setPlanDay'; day: Day; recipeId: string | null }
   | { type: 'autofillPlan' }
   | { type: 'toggleGrocery'; key: string }
@@ -47,7 +49,12 @@ export type Action =
 export function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'hydrate':
-      return { ...initialState, ...action.state, plan: { ...emptyPlan(), ...action.state.plan } };
+      return {
+        ...initialState,
+        ...action.state,
+        members: (action.state.members ?? []).map(withPrefs),
+        plan: { ...emptyPlan(), ...action.state.plan },
+      };
     case 'addMember':
       return { ...state, members: [...state.members, action.member] };
     case 'updateMember':
@@ -81,6 +88,15 @@ export function reducer(state: AppState, action: Action): AppState {
         recipes[r.id] = r;
       }
       return { ...state, recipes, deckOrder };
+    }
+    case 'importRecipe': {
+      // A recipe someone added from a link goes to the top of everyone's deck.
+      const { recipe } = action;
+      return {
+        ...state,
+        recipes: { ...state.recipes, [recipe.id]: recipe },
+        deckOrder: [recipe.id, ...state.deckOrder.filter((id) => id !== recipe.id)],
+      };
     }
     case 'setPlanDay':
       return { ...state, plan: { ...state.plan, [action.day]: action.recipeId } };

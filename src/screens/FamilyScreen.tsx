@@ -1,14 +1,17 @@
 import { useState } from 'react';
 import { Alert, Pressable, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { MATCH_RULES } from '../logic/matching';
+import { CUISINES, emptyPrefs, isVegetarian, KINDS, MEATS, prefsSummary, vegetarianSkips } from '../logic/preferences';
 import { newId, useStore } from '../state/store';
 import { formatCode } from '../sync/household';
 import { AVATARS, colors, radius } from '../theme';
-import { Member } from '../types';
+import { FoodPrefs, Member } from '../types';
 
-type Draft = { id: string | null; name: string; avatar: string; isKid: boolean; noFoods: string };
+type Draft = { id: string | null; name: string; avatar: string; isKid: boolean; noFoods: string; prefs: FoodPrefs };
 
-const blankDraft = (avatar: string): Draft => ({ id: null, name: '', avatar, isKid: false, noFoods: '' });
+const blankDraft = (avatar: string): Draft => ({ id: null, name: '', avatar, isKid: false, noFoods: '', prefs: emptyPrefs() });
+
+const toggle = (list: string[], value: string) => (list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
 
 export function FamilyScreen({ onDone }: { onDone: () => void }) {
   const { state, dispatch, household, leaveFamily } = useStore();
@@ -22,13 +25,14 @@ export function FamilyScreen({ onDone }: { onDone: () => void }) {
       avatar: draft.avatar,
       isKid: draft.isKid,
       noFoods: draft.noFoods.split(',').map((s) => s.trim()).filter(Boolean),
+      prefs: draft.prefs,
     };
     dispatch({ type: draft.id ? 'updateMember' : 'addMember', member });
     setDraft(null);
   };
 
   const edit = (m: Member) =>
-    setDraft({ id: m.id, name: m.name, avatar: m.avatar, isKid: m.isKid, noFoods: m.noFoods.join(', ') });
+    setDraft({ id: m.id, name: m.name, avatar: m.avatar, isKid: m.isKid, noFoods: m.noFoods.join(', '), prefs: m.prefs });
 
   const remove = (m: Member) =>
     Alert.alert(`Remove ${m.name}?`, 'Their swipes for this week will be removed too.', [
@@ -45,7 +49,7 @@ export function FamilyScreen({ onDone }: { onDone: () => void }) {
   const shareCode = () => {
     if (!household) return;
     Share.share({
-      message: `Join our family on FamilySwipe so we can pick dinners together! Open the app, tap "Join your family" and type this code: ${formatCode(household.inviteCode)}`,
+      message: `Join our family on Kitchen Cupid so we can pick dinners together! Open the app, tap "Join your family" and type this code: ${formatCode(household.inviteCode)}`,
     }).catch(() => {});
   };
 
@@ -79,7 +83,7 @@ export function FamilyScreen({ onDone }: { onDone: () => void }) {
           <Text style={styles.label}>{household.name}: family code</Text>
           <Text style={styles.code}>{formatCode(household.inviteCode)}</Text>
           <Text style={styles.help}>
-            To add a phone or tablet (Grandpa's phone, a kid's iPad or Kindle), open FamilySwipe on it, tap "Join your
+            To add a phone or tablet (Grandpa's phone, a kid's iPad or Kindle), open Kitchen Cupid on it, tap "Join your
             family" and type this code.
           </Text>
           <Pressable onPress={shareCode} style={styles.secondary}>
@@ -97,7 +101,7 @@ export function FamilyScreen({ onDone }: { onDone: () => void }) {
               {m.name}
               {m.isKid ? '  ·  Kid' : ''}
             </Text>
-            {m.noFoods.length > 0 && <Text style={styles.noFoods}>Never: {m.noFoods.join(', ')}</Text>}
+            {prefsSummary(m) !== '' && <Text style={styles.noFoods}>{prefsSummary(m)}</Text>}
           </View>
           <Pressable onPress={() => edit(m)} style={styles.linkBtn}>
             <Text style={styles.link}>Edit</Text>
@@ -142,7 +146,56 @@ export function FamilyScreen({ onDone }: { onDone: () => void }) {
               trackColor={{ true: colors.basil, false: colors.line }}
             />
           </View>
-          <Text style={styles.label}>Foods they never eat (optional)</Text>
+          <Text style={[styles.h2, { marginTop: 8 }]}>Food preferences</Text>
+          <Text style={styles.help}>All optional. Kitchen Cupid shows the dinners your family likes most first.</Text>
+
+          <Text style={styles.label}>Favorite kinds of dinner</Text>
+          <View style={styles.chips}>
+            {KINDS.map((k) => (
+              <Chip
+                key={k.value}
+                label={`${k.icon} ${k.value}`}
+                on={draft.prefs.kinds.includes(k.value)}
+                onPress={() => setDraft({ ...draft, prefs: { ...draft.prefs, kinds: toggle(draft.prefs.kinds, k.value) } })}
+              />
+            ))}
+          </View>
+
+          <Text style={styles.label}>Favorite cuisines</Text>
+          <View style={styles.chips}>
+            {CUISINES.map((c) => (
+              <Chip
+                key={c.value}
+                label={`${c.icon} ${c.value}`}
+                on={draft.prefs.cuisines.includes(c.value)}
+                onPress={() => setDraft({ ...draft, prefs: { ...draft.prefs, cuisines: toggle(draft.prefs.cuisines, c.value) } })}
+              />
+            ))}
+          </View>
+
+          <Text style={styles.label}>Never eats</Text>
+          <View style={styles.chips}>
+            <Chip
+              label="🥕 Vegetarian"
+              on={isVegetarian(draft.prefs)}
+              no
+              onPress={() =>
+                setDraft({ ...draft, prefs: { ...draft.prefs, skips: isVegetarian(draft.prefs) ? [] : vegetarianSkips() } })
+              }
+            />
+            {MEATS.map((m) => (
+              <Chip
+                key={m.value}
+                label={m.label}
+                on={draft.prefs.skips.includes(m.value)}
+                no
+                onPress={() => setDraft({ ...draft, prefs: { ...draft.prefs, skips: toggle(draft.prefs.skips, m.value) } })}
+              />
+            ))}
+          </View>
+          <Text style={styles.help}>Dinners with these are hidden for the whole family.</Text>
+
+          <Text style={styles.label}>Other foods they never eat, like allergies (optional)</Text>
           <TextInput
             value={draft.noFoods}
             onChangeText={(noFoods) => setDraft({ ...draft, noFoods })}
@@ -203,6 +256,22 @@ export function FamilyScreen({ onDone }: { onDone: () => void }) {
   );
 }
 
+function Chip({ label, on, no, onPress }: { label: string; on: boolean; no?: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.chip, on && (no ? styles.chipNo : styles.chipOn)]}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: on }}
+    >
+      <Text style={[styles.chipText, on && { color: no ? colors.match : colors.basil }]}>
+        {on && no ? '🚫 ' : ''}
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   wrap: { padding: 16, gap: 10, paddingBottom: 40 },
   codeCard: { backgroundColor: colors.surface, borderRadius: radius.md, padding: 16, gap: 6, borderWidth: 2, borderColor: colors.basil, alignItems: 'center' },
@@ -219,6 +288,12 @@ const styles = StyleSheet.create({
   link: { color: colors.basil, fontWeight: '700' },
   form: { backgroundColor: colors.surface, borderRadius: radius.md, padding: 14, gap: 8, borderWidth: 1, borderColor: colors.line },
   label: { fontSize: 15, fontWeight: '800', color: colors.text },
+  h2: { fontSize: 19, fontWeight: '800', color: colors.text },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1.5, borderColor: colors.line, backgroundColor: colors.bg },
+  chipOn: { borderColor: colors.basil, backgroundColor: colors.basilSoft },
+  chipNo: { borderColor: colors.match, backgroundColor: colors.matchSoft },
+  chipText: { fontSize: 15, fontWeight: '700', color: colors.text },
   help: { fontSize: 13, color: colors.muted },
   input: { borderWidth: 1, borderColor: colors.line, borderRadius: radius.sm, padding: 12, fontSize: 16, color: colors.text, backgroundColor: colors.bg },
   avatars: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },

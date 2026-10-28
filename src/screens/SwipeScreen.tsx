@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { fetchDinnerDeck } from '../api/recipes';
+import { AddRecipeSheet } from '../components/AddRecipeSheet';
 import { MatchModal } from '../components/MatchModal';
 import { RecipeDetail } from '../components/RecipeDetail';
 import { SwipeDeck } from '../components/SwipeDeck';
-import { deckFor, isMatch, likersOf } from '../logic/matching';
+import { deckFor, isBlocked, isMatch, likersOf } from '../logic/matching';
+import { familyScore, hasAnyLikes } from '../logic/preferences';
 import { useStore } from '../state/store';
 import { colors, radius } from '../theme';
 import { Recipe, Vote } from '../types';
@@ -22,15 +24,44 @@ export function SwipeScreen() {
   const [error, setError] = useState<string | null>(null);
   const [matched, setMatched] = useState<Recipe | null>(null);
   const [open, setOpen] = useState<Recipe | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [added, setAdded] = useState<string | null>(null);
+
+  const addSheet = (
+    <AddRecipeSheet
+      visible={adding}
+      onClose={() => setAdding(false)}
+      onAdded={(r) => setAdded(`Added "${r.name}" to the top of the deck.`)}
+    />
+  );
+  const addButton = (
+    <Pressable onPress={() => setAdding(true)} style={styles.secondary} accessibilityRole="button">
+      <Text style={styles.secondaryText}>🔗 Add a recipe from a link</Text>
+    </Pressable>
+  );
 
   const swiper = state.members.find((m) => m.id === swiperId) ?? null;
   const deck = useMemo(() => (swiper ? deckFor(state, swiper.id) : []), [state, swiper]);
+
+  // Latest family and deck, read when loading so loadMore doesn't change on every swipe.
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   const loadMore = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      dispatch({ type: 'addRecipes', recipes: await fetchDinnerDeck() });
+      const { members, deckOrder } = stateRef.current;
+      const recipes = await fetchDinnerDeck(40, {
+        exclude: new Set(deckOrder),
+        allowed: (r) => !isBlocked(members, r),
+        score: hasAnyLikes(members) ? (r) => familyScore(members, r) : undefined,
+      });
+      if (recipes.length === 0) {
+        setError("We've run out of dinners that fit everyone's food preferences. You can loosen them on the Family tab.");
+        return;
+      }
+      dispatch({ type: 'addRecipes', recipes });
     } catch {
       setError("Couldn't load recipes. Check your internet connection and try again.");
     } finally {
@@ -77,6 +108,9 @@ export function SwipeScreen() {
         </View>
         {loading && <ActivityIndicator color={colors.basil} />}
         {error && <ErrorBox message={error} onRetry={loadMore} />}
+        {added && <Text style={styles.added}>{added}</Text>}
+        {addButton}
+        {addSheet}
       </ScrollView>
     );
   }
@@ -88,10 +122,20 @@ export function SwipeScreen() {
           {swiper.avatar} {swiper.name}
           {swiper.isKid ? '  ·  Kid mode' : ''}
         </Text>
-        <Pressable onPress={() => setSwiperId(null)} style={styles.passBtn}>
-          <Text style={styles.passText}>{switchLabel}</Text>
-        </Pressable>
+        <View style={styles.headerBtns}>
+          <Pressable onPress={() => setAdding(true)} style={styles.passBtn} accessibilityLabel="Add a recipe from a link">
+            <Text style={styles.passText}>🔗 Add</Text>
+          </Pressable>
+          <Pressable onPress={() => setSwiperId(null)} style={styles.passBtn}>
+            <Text style={styles.passText}>{switchLabel}</Text>
+          </Pressable>
+        </View>
       </View>
+      {added && (
+        <Pressable onPress={() => setAdded(null)}>
+          <Text style={styles.added}>{added}</Text>
+        </Pressable>
+      )}
 
       {deck.length > 0 ? (
         <SwipeDeck recipes={deck} kidMode={swiper.isKid} onVote={handleVote} onOpen={setOpen} />
@@ -111,11 +155,13 @@ export function SwipeScreen() {
           <Pressable style={styles.secondary} onPress={loadMore} disabled={loading}>
             <Text style={styles.secondaryText}>{loading ? 'Loading…' : 'Load more dinners'}</Text>
           </Pressable>
+          {addButton}
         </View>
       )}
 
       <MatchModal recipe={matched} likers={matched ? likersOf(state, matched.id) : []} onClose={() => setMatched(null)} />
       <RecipeDetail recipe={open} onClose={() => setOpen(null)} />
+      {addSheet}
     </View>
   );
 }
@@ -143,6 +189,8 @@ const styles = StyleSheet.create({
   swipeWrap: { flex: 1, padding: 16, gap: 12 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   headerName: { fontSize: 18, fontWeight: '800', color: colors.text, flexShrink: 1 },
+  headerBtns: { flexDirection: 'row', gap: 8 },
+  added: { backgroundColor: colors.basilSoft, color: colors.basil, fontWeight: '700', padding: 10, borderRadius: radius.sm, overflow: 'hidden', textAlign: 'center' },
   passBtn: { backgroundColor: colors.basilSoft, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999 },
   passText: { color: colors.basil, fontWeight: '800' },
   done: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 12 },

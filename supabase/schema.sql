@@ -1,4 +1,4 @@
--- FamilySwipe: shared family households.
+-- Kitchen Cupid: shared family households.
 -- Paste this whole file into the Supabase SQL Editor and press Run. It is safe to run again.
 --
 -- How it fits together:
@@ -38,9 +38,13 @@ create table if not exists public.members (
   avatar text not null default '🦊',
   is_kid boolean not null default false,
   no_foods text[] not null default '{}',
+  -- Food preferences: { "cuisines": [...], "kinds": [...], "skips": [...] }
+  prefs jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   primary key (household_id, id)
 );
+-- For families set up before food preferences existed.
+alter table public.members add column if not exists prefs jsonb not null default '{}'::jsonb;
 
 create table if not exists public.recipes (
   household_id uuid not null references public.households on delete cascade,
