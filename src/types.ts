@@ -8,6 +8,8 @@ export type Recipe = {
   cuisine: string;
   ingredients: Ingredient[];
   instructions: string;
+  /** The web page a family member imported this recipe from, if they pasted a link. */
+  sourceUrl?: string;
 };
 
 export type Member = {

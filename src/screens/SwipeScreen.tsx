@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { fetchDinnerDeck } from '../api/recipes';
+import { AddRecipeSheet } from '../components/AddRecipeSheet';
 import { MatchModal } from '../components/MatchModal';
 import { RecipeDetail } from '../components/RecipeDetail';
 import { SwipeDeck } from '../components/SwipeDeck';
@@ -22,6 +23,21 @@ export function SwipeScreen() {
   const [error, setError] = useState<string | null>(null);
   const [matched, setMatched] = useState<Recipe | null>(null);
   const [open, setOpen] = useState<Recipe | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [added, setAdded] = useState<string | null>(null);
+
+  const addSheet = (
+    <AddRecipeSheet
+      visible={adding}
+      onClose={() => setAdding(false)}
+      onAdded={(r) => setAdded(`Added "${r.name}" to the top of the deck.`)}
+    />
+  );
+  const addButton = (
+    <Pressable onPress={() => setAdding(true)} style={styles.secondary} accessibilityRole="button">
+      <Text style={styles.secondaryText}>🔗 Add a recipe from a link</Text>
+    </Pressable>
+  );
 
   const swiper = state.members.find((m) => m.id === swiperId) ?? null;
   const deck = useMemo(() => (swiper ? deckFor(state, swiper.id) : []), [state, swiper]);
@@ -77,6 +93,9 @@ export function SwipeScreen() {
         </View>
         {loading && <ActivityIndicator color={colors.basil} />}
         {error && <ErrorBox message={error} onRetry={loadMore} />}
+        {added && <Text style={styles.added}>{added}</Text>}
+        {addButton}
+        {addSheet}
       </ScrollView>
     );
   }
@@ -88,10 +107,20 @@ export function SwipeScreen() {
           {swiper.avatar} {swiper.name}
           {swiper.isKid ? '  ·  Kid mode' : ''}
         </Text>
-        <Pressable onPress={() => setSwiperId(null)} style={styles.passBtn}>
-          <Text style={styles.passText}>{switchLabel}</Text>
-        </Pressable>
+        <View style={styles.headerBtns}>
+          <Pressable onPress={() => setAdding(true)} style={styles.passBtn} accessibilityLabel="Add a recipe from a link">
+            <Text style={styles.passText}>🔗 Add</Text>
+          </Pressable>
+          <Pressable onPress={() => setSwiperId(null)} style={styles.passBtn}>
+            <Text style={styles.passText}>{switchLabel}</Text>
+          </Pressable>
+        </View>
       </View>
+      {added && (
+        <Pressable onPress={() => setAdded(null)}>
+          <Text style={styles.added}>{added}</Text>
+        </Pressable>
+      )}
 
       {deck.length > 0 ? (
         <SwipeDeck recipes={deck} kidMode={swiper.isKid} onVote={handleVote} onOpen={setOpen} />
@@ -111,11 +140,13 @@ export function SwipeScreen() {
           <Pressable style={styles.secondary} onPress={loadMore} disabled={loading}>
             <Text style={styles.secondaryText}>{loading ? 'Loading…' : 'Load more dinners'}</Text>
           </Pressable>
+          {addButton}
         </View>
       )}
 
       <MatchModal recipe={matched} likers={matched ? likersOf(state, matched.id) : []} onClose={() => setMatched(null)} />
       <RecipeDetail recipe={open} onClose={() => setOpen(null)} />
+      {addSheet}
     </View>
   );
 }
@@ -143,6 +174,8 @@ const styles = StyleSheet.create({
   swipeWrap: { flex: 1, padding: 16, gap: 12 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   headerName: { fontSize: 18, fontWeight: '800', color: colors.text, flexShrink: 1 },
+  headerBtns: { flexDirection: 'row', gap: 8 },
+  added: { backgroundColor: colors.basilSoft, color: colors.basil, fontWeight: '700', padding: 10, borderRadius: radius.sm, overflow: 'hidden', textAlign: 'center' },
   passBtn: { backgroundColor: colors.basilSoft, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999 },
   passText: { color: colors.basil, fontWeight: '800' },
   done: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 12 },

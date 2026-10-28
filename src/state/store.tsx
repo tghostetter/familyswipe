@@ -39,6 +39,7 @@ export type Action =
   | { type: 'vote'; memberId: string; recipeId: string; vote: Vote }
   | { type: 'undoVote'; memberId: string; recipeId: string }
   | { type: 'addRecipes'; recipes: Recipe[] }
+  | { type: 'importRecipe'; recipe: Recipe }
   | { type: 'setPlanDay'; day: Day; recipeId: string | null }
   | { type: 'autofillPlan' }
   | { type: 'toggleGrocery'; key: string }
@@ -81,6 +82,15 @@ export function reducer(state: AppState, action: Action): AppState {
         recipes[r.id] = r;
       }
       return { ...state, recipes, deckOrder };
+    }
+    case 'importRecipe': {
+      // A recipe someone added from a link goes to the top of everyone's deck.
+      const { recipe } = action;
+      return {
+        ...state,
+        recipes: { ...state.recipes, [recipe.id]: recipe },
+        deckOrder: [recipe.id, ...state.deckOrder.filter((id) => id !== recipe.id)],
+      };
     }
     case 'setPlanDay':
       return { ...state, plan: { ...state.plan, [action.day]: action.recipeId } };
