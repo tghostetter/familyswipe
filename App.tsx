@@ -1,6 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { matchedRecipeIds } from './src/logic/matching';
 import { FamilyScreen } from './src/screens/FamilyScreen';
@@ -25,12 +26,14 @@ const TABS: { key: Tab; label: string; icon: string }[] = [
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <StoreProvider>
-        <StatusBar style="dark" />
-        <Main />
-      </StoreProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <StoreProvider>
+          <StatusBar style="dark" />
+          <Main />
+        </StoreProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 

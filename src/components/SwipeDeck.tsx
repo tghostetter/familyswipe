@@ -1,12 +1,25 @@
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef } from 'react';
-import { Animated, Dimensions, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
+import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
+import Animated, {
+  Extrapolation,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { colors, radius } from '../theme';
 import { Recipe, Vote } from '../types';
 
 const SCREEN_W = Dimensions.get('window').width;
 const SWIPE_THRESHOLD = SCREEN_W * 0.28;
+// A quick flick counts as a swipe even if the card hasn't moved far yet.
+const FLICK_VELOCITY = 800;
+const FLY_DISTANCE = SCREEN_W * 1.5;
 
 type Props = {
   recipes: Recipe[];
@@ -16,91 +29,135 @@ type Props = {
 };
 
 export function SwipeDeck({ recipes, kidMode, onVote, onOpen }: Props) {
-  const position = useRef(new Animated.ValueXY()).current;
+  const x = useSharedValue(0);
+  const y = useSharedValue(0);
+  // True while a card is flying away, so a second swipe or tap can't double-vote.
+  const busy = useSharedValue(false);
   const top = recipes[0];
   const next = recipes[1];
 
-  // PanResponder is created once, so read the latest values through refs.
+  // Animation callbacks run on the UI thread, so read the latest values through a ref.
   const latest = useRef({ top, onVote });
   latest.current = { top, onVote };
 
   useEffect(() => {
-    position.setValue({ x: 0, y: 0 });
-  }, [top?.id, position]);
+    x.value = 0;
+    y.value = 0;
+    busy.value = false;
+  }, [top?.id, x, y, busy]);
 
-  const flyOut = (vote: Vote) => {
+  const commitVote = (vote: Vote) => {
     const recipe = latest.current.top;
-    if (!recipe) return;
+    if (recipe) latest.current.onVote(recipe, vote);
+  };
+  const tick = () => {
+    Haptics.selectionAsync().catch(() => {});
+  };
+  const thump = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    Animated.timing(position, {
-      toValue: { x: (vote === 'yum' ? 1 : -1) * SCREEN_W * 1.5, y: 40 },
-      duration: 220,
-      useNativeDriver: true,
-    }).start(() => latest.current.onVote(recipe, vote));
   };
 
-  const pan = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) > 8,
-      onPanResponderMove: Animated.event([null, { dx: position.x, dy: position.y }], {
-        useNativeDriver: false,
-      }),
-      onPanResponderRelease: (_e, g) => {
-        if (g.dx > SWIPE_THRESHOLD) flyOut('yum');
-        else if (g.dx < -SWIPE_THRESHOLD) flyOut('nope');
-        else Animated.spring(position, { toValue: { x: 0, y: 0 }, useNativeDriver: true }).start();
-      },
-    }),
-  ).current;
+  const flyOut = (vote: Vote, fromY = 40) => {
+    'worklet';
+    busy.value = true;
+    scheduleOnRN(thump);
+    y.value = withTiming(fromY, { duration: 240 });
+    x.value = withTiming((vote === 'yum' ? 1 : -1) * FLY_DISTANCE, { duration: 240 }, (finished) => {
+      if (finished) scheduleOnRN(commitVote, vote);
+    });
+  };
+
+  const pan = usePanGesture({
+    // Only grab sideways drags, so tapping the card still opens the recipe.
+    activeOffsetX: [-10, 10],
+    onUpdate: (e) => {
+      if (busy.value) return;
+      const wasPast = Math.abs(x.value) > SWIPE_THRESHOLD;
+      x.value = e.translationX;
+      y.value = e.translationY;
+      // A little buzz the moment the card crosses the "let go to vote" line.
+      if (wasPast !== Math.abs(x.value) > SWIPE_THRESHOLD) scheduleOnRN(tick);
+    },
+    onDeactivate: (e) => {
+      if (busy.value) return;
+      const goRight = e.translationX > SWIPE_THRESHOLD || (e.velocityX > FLICK_VELOCITY && e.translationX > 0);
+      const goLeft = e.translationX < -SWIPE_THRESHOLD || (e.velocityX < -FLICK_VELOCITY && e.translationX < 0);
+      if (goRight) flyOut('yum', e.translationY + 40);
+      else if (goLeft) flyOut('nope', e.translationY + 40);
+      else {
+        x.value = withSpring(0);
+        y.value = withSpring(0);
+      }
+    },
+  });
+
+  const cardStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: x.value },
+      { translateY: y.value },
+      { rotate: `${interpolate(x.value, [-SCREEN_W, 0, SCREEN_W], [-14, 0, 14])}deg` },
+    ],
+  }));
+  const yumStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(x.value, [0, SWIPE_THRESHOLD], [0, 1], Extrapolation.CLAMP),
+  }));
+  const nopeStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(x.value, [-SWIPE_THRESHOLD, 0], [1, 0], Extrapolation.CLAMP),
+  }));
+  // The next card grows into place as the top one is dragged away.
+  const behindStyle = useAnimatedStyle(() => {
+    const t = interpolate(Math.abs(x.value), [0, SWIPE_THRESHOLD], [0, 1], Extrapolation.CLAMP);
+    return {
+      opacity: 0.8 + 0.2 * t,
+      transform: [{ scale: 0.95 + 0.05 * t }, { translateY: 14 * (1 - t) }],
+    };
+  });
+
+  const press = (vote: Vote) => {
+    if (busy.value) return;
+    flyOut(vote);
+  };
 
   if (!top) return null;
-
-  const rotate = position.x.interpolate({
-    inputRange: [-SCREEN_W, 0, SCREEN_W],
-    outputRange: ['-14deg', '0deg', '14deg'],
-  });
-  const yumOpacity = position.x.interpolate({ inputRange: [0, SWIPE_THRESHOLD], outputRange: [0, 1], extrapolate: 'clamp' });
-  const nopeOpacity = position.x.interpolate({ inputRange: [-SWIPE_THRESHOLD, 0], outputRange: [1, 0], extrapolate: 'clamp' });
 
   return (
     <View style={styles.wrap}>
       <View style={styles.stack}>
         {next && (
-          <View style={[styles.card, styles.behind]}>
+          <Animated.View style={[styles.card, behindStyle]}>
             <Image source={next.image} style={styles.photo} contentFit="cover" />
-          </View>
-        )}
-        <Animated.View
-          {...pan.panHandlers}
-          style={[styles.card, { transform: [...position.getTranslateTransform(), { rotate }] }]}
-        >
-          <Pressable style={{ flex: 1 }} onPress={() => onOpen(top)}>
-            <Image source={top.image} style={styles.photo} contentFit="cover" transition={150} />
-            <View style={styles.caption}>
-              <Text style={[styles.name, kidMode && styles.nameKid]} numberOfLines={2}>
-                {top.name}
-              </Text>
-              {!kidMode && (
-                <Text style={styles.meta}>
-                  {[top.cuisine, top.category, `${top.ingredients.length} ingredients`].filter(Boolean).join(' · ')}
-                  {'  ·  Tap for recipe'}
-                </Text>
-              )}
-            </View>
-          </Pressable>
-          <Animated.View style={[styles.stamp, styles.stampYum, { opacity: yumOpacity }]}>
-            <Text style={[styles.stampText, { color: colors.basil }]}>YUM</Text>
           </Animated.View>
-          <Animated.View style={[styles.stamp, styles.stampNope, { opacity: nopeOpacity }]}>
+        )}
+        <GestureDetector gesture={pan}>
+            <Animated.View style={[styles.card, cardStyle]}>
+            <Pressable style={{ flex: 1 }} onPress={() => onOpen(top)}>
+              <Image source={top.image} style={styles.photo} contentFit="cover" transition={150} />
+              <View style={styles.caption}>
+                <Text style={[styles.name, kidMode && styles.nameKid]} numberOfLines={2}>
+                  {top.name}
+                </Text>
+                {!kidMode && (
+                  <Text style={styles.meta}>
+                    {[top.cuisine, top.category, `${top.ingredients.length} ingredients`].filter(Boolean).join(' · ')}
+                    {'  ·  Tap for recipe'}
+                  </Text>
+                )}
+              </View>
+            </Pressable>
+            <Animated.View pointerEvents="none" style={[styles.stamp, styles.stampYum, yumStyle]}>
+              <Text style={[styles.stampText, { color: colors.basil }]}>YUM</Text>
+            </Animated.View>
+            <Animated.View pointerEvents="none" style={[styles.stamp, styles.stampNope, nopeStyle]}>
             <Text style={[styles.stampText, { color: colors.nope }]}>NOPE</Text>
           </Animated.View>
-        </Animated.View>
+          </Animated.View>
+        </GestureDetector>
       </View>
 
       <View style={styles.buttons}>
         <Pressable
           accessibilityLabel="Nope"
-          onPress={() => flyOut('nope')}
+          onPress={() => press('nope')}
           style={({ pressed }) => [styles.btn, kidMode && styles.btnKid, styles.btnNope, pressed && styles.pressed]}
         >
           <Text style={[styles.btnIcon, kidMode && styles.btnIconKid]}>{kidMode ? '😝' : '✕'}</Text>
@@ -108,7 +165,7 @@ export function SwipeDeck({ recipes, kidMode, onVote, onOpen }: Props) {
         </Pressable>
         <Pressable
           accessibilityLabel="Yum"
-          onPress={() => flyOut('yum')}
+          onPress={() => press('yum')}
           style={({ pressed }) => [styles.btn, kidMode && styles.btnKid, styles.btnYum, pressed && styles.pressed]}
         >
           <Text style={[styles.btnIcon, kidMode && styles.btnIconKid, { color: '#fff' }]}>{kidMode ? '😋' : '♥'}</Text>
@@ -137,7 +194,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     elevation: 4,
   },
-  behind: { transform: [{ scale: 0.95 }, { translateY: 14 }], opacity: 0.8 },
   photo: { flex: 1, backgroundColor: colors.basilSoft },
   caption: { padding: 18, gap: 4 },
   name: { fontSize: 24, fontWeight: '800', color: colors.text },
