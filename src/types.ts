@@ -19,6 +19,16 @@ export type Member = {
   isKid: boolean;
   /** Foods this person never eats (or is allergic to). Matching recipes are hidden for the whole family. */
   noFoods: string[];
+  prefs: FoodPrefs;
+};
+
+export type FoodPrefs = {
+  /** Cuisines this person loves, e.g. "Italian". Used to pick and order the dinners in the deck. */
+  cuisines: string[];
+  /** Kinds of dinner this person loves, e.g. "Chicken" or "Pasta". */
+  kinds: string[];
+  /** Meats this person never eats, e.g. "pork". Matching recipes are hidden for the whole family. */
+  skips: string[];
 };
 
 export type MatchRule = 'everyone' | 'majority' | 'parentsPlusKid';
