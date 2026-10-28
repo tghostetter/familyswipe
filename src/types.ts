@@ -1,5 +1,8 @@
 export type Ingredient = { name: string; measure: string };
 
+export const MEAL_SLOTS = ['breakfast', 'lunch', 'dinner'] as const;
+export type MealSlot = (typeof MEAL_SLOTS)[number];
+
 export type Recipe = {
   id: string;
   name: string;
@@ -10,6 +13,8 @@ export type Recipe = {
   instructions: string;
   /** The web page a family member imported this recipe from, if they pasted a link. */
   sourceUrl?: string;
+  /** Which meal this recipe is for. Missing means dinner (recipes saved before breakfasts and lunches existed). */
+  mealType?: MealSlot;
 };
 
 export type Member = {

@@ -14,7 +14,7 @@ const DAY_NAMES: Record<string, string> = {
 export function PlanScreen() {
   const { state, dispatch } = useStore();
   const [open, setOpen] = useState<Recipe | null>(null);
-  const matches = matchedRecipeIds(state);
+  const matches = matchedRecipeIds(state, 'dinner');
   const planned = new Set(Object.values(state.plan).filter(Boolean));
   const spareMatches = matches.filter((id) => !planned.has(id)).length;
 

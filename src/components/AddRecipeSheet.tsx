@@ -15,12 +15,18 @@ import {
 import { ImportError, importRecipeFromUrl, siteName } from '../api/importRecipe';
 import { useStore } from '../state/store';
 import { colors, radius } from '../theme';
-import { Recipe } from '../types';
+import { MealSlot, Recipe } from '../types';
 
-type Props = { visible: boolean; onClose: () => void; onAdded: (recipe: Recipe) => void };
+type Props = {
+  visible: boolean;
+  /** The meal the family is swiping on, so a pasted breakfast lands in the breakfast deck. */
+  mealType: MealSlot;
+  onClose: () => void;
+  onAdded: (recipe: Recipe) => void;
+};
 
 /** Paste a link to any recipe page and add it to the family's deck. */
-export function AddRecipeSheet({ visible, onClose, onAdded }: Props) {
+export function AddRecipeSheet({ visible, mealType, onClose, onAdded }: Props) {
   const { state, dispatch, household } = useStore();
   const [link, setLink] = useState('');
   const [loading, setLoading] = useState(false);
@@ -55,8 +61,9 @@ export function AddRecipeSheet({ visible, onClose, onAdded }: Props) {
 
   const add = () => {
     if (!found) return;
-    dispatch({ type: 'importRecipe', recipe: found });
-    onAdded(found);
+    const recipe = { ...found, mealType };
+    dispatch({ type: 'importRecipe', recipe });
+    onAdded(recipe);
     close();
   };
 

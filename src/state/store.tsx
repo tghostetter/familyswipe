@@ -102,7 +102,7 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, plan: { ...state.plan, [action.day]: action.recipeId } };
     case 'autofillPlan': {
       const planned = new Set(Object.values(state.plan).filter(Boolean));
-      const unplanned = matchedRecipeIds(state).filter((id) => !planned.has(id));
+      const unplanned = matchedRecipeIds(state, 'dinner').filter((id) => !planned.has(id));
       const plan = { ...state.plan };
       for (const day of DAYS) {
         if (!plan[day] && unplanned.length) plan[day] = unplanned.shift()!;
