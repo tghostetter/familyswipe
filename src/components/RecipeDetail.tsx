@@ -2,8 +2,10 @@ import { Image } from 'expo-image';
 import { Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { siteName } from '../api/importRecipe';
+import { estimateNutrition } from '../logic/nutrition';
 import { colors, radius } from '../theme';
 import { Recipe } from '../types';
+import { NutritionPanel } from './Nutrition';
 
 type Props = { recipe: Recipe | null; onClose: () => void };
 
@@ -23,6 +25,9 @@ export function RecipeDetail({ recipe, onClose }: Props) {
                   <Text style={styles.source}>🔗 From {siteName(recipe.sourceUrl)} · Open the full recipe</Text>
                 </Pressable>
               )}
+
+              <Text style={styles.h}>Nutrition</Text>
+              <NutritionPanel n={estimateNutrition(recipe)} />
 
               <Text style={styles.h}>Ingredients</Text>
               {recipe.ingredients.map((ing, i) => (

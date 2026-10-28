@@ -10,6 +10,10 @@ export type Recipe = {
   instructions: string;
   /** The web page a family member imported this recipe from, if they pasted a link. */
   sourceUrl?: string;
+  /** How many people the recipe feeds, when the recipe says so. */
+  servings?: number;
+  /** Nutrition per serving from the recipe's own website, when it lists it. */
+  siteNutrition?: Partial<Record<'calories' | 'protein' | 'carbs' | 'fat' | 'satFat' | 'sugar' | 'fiber' | 'sodium', number>>;
 };
 
 export type Member = {

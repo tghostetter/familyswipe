@@ -13,8 +13,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import { siteName } from '../api/importRecipe';
+import { estimateNutrition } from '../logic/nutrition';
 import { colors, radius } from '../theme';
 import { Recipe, Vote } from '../types';
+import { NutritionLine } from './Nutrition';
 
 const SCREEN_W = Dimensions.get('window').width;
 const SWIPE_THRESHOLD = SCREEN_W * 0.28;
@@ -143,6 +145,7 @@ export function SwipeDeck({ recipes, kidMode, onVote, onOpen }: Props) {
                     {'  ·  Tap for recipe'}
                   </Text>
                 )}
+                {!kidMode && <NutritionLine n={estimateNutrition(top)} />}
               </View>
             </Pressable>
             <Animated.View pointerEvents="none" style={[styles.stamp, styles.stampYum, yumStyle]}>
