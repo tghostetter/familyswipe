@@ -26,8 +26,8 @@ Changes to the code show up on the phone right away while `npx expo start` is ru
 | Family | Shows your family code for adding phones and tablets. Add family members, mark kids, pick avatars, set each person's food preferences (favorite dinners and cuisines, meats and other foods they never eat), choose what counts as a match, start a new week |
 | Swipe | Tap your name (each device remembers you), then swipe right (yum) or left (nope). Kids get big photos and Yum / Yuck buttons. Tap a card to see the recipe. "🔗 Add" lets you paste a link to any recipe website, and that dinner goes to the top of everyone's deck |
 | Matches | Dinners the family agreed on. "Add" puts one on the next empty night |
-| Plan | Monday to Sunday. "Fill empty nights" uses your matches |
-| Groceries | Every ingredient for the planned dinners, combined, with check boxes |
+| Plan | Monday to Sunday, for dinner and (if you turn them on) breakfast and school lunch. "Fill empty spots" uses your matches; tap a meal to swap it, move it to another day, or take it off |
+| Groceries | Every ingredient for the planned meals, added up and sorted by store aisle, with check boxes. Add your own items, or send the list in a text |
 
 ## Where the code lives
 
@@ -35,7 +35,8 @@ Changes to the code show up on the phone right away while `npx expo start` is ru
 - `src/screens/`: one file per tab
 - `src/components/`: the swipe cards, match pop-up, and recipe page
 - `src/logic/matching.ts`: the match rules (everyone, majority, parents plus a kid)
-- `src/logic/grocery.ts`: builds the grocery list
+- `src/logic/plan.ts`: the weekly plan (filling, swapping and moving meals)
+- `src/logic/grocery.ts`: builds the shopping list (adds up amounts, sorts by aisle)
 - `src/api/recipes.ts`: loads recipes and photos from TheMealDB
 - `src/api/importRecipe.ts`: reads a recipe from a pasted website link
 - `src/state/store.tsx`: keeps the app's data on the phone and sends changes to the family

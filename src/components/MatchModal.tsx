@@ -1,5 +1,6 @@
 import { Image } from 'expo-image';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { photoFit } from '../logic/matching';
 import { colors, radius } from '../theme';
 import { Member, Recipe } from '../types';
 
@@ -12,7 +13,7 @@ export function MatchModal({ recipe, likers, onClose }: Props) {
         {recipe && (
           <View style={styles.box}>
             <Text style={styles.title}>It's a match!</Text>
-            <Image source={recipe.image} style={styles.photo} contentFit="cover" />
+            <Image source={recipe.image} style={styles.photo} contentFit={photoFit(recipe)} />
             <Text style={styles.name}>{recipe.name}</Text>
             <Text style={styles.avatars}>{likers.map((m) => m.avatar).join('  ')}</Text>
             <Text style={styles.who}>{likers.map((m) => m.name).join(', ')} said yum</Text>

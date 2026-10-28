@@ -1,11 +1,12 @@
+import { changedSpots, emptyPlan } from '../logic/plan';
 import { Action, initialState } from '../state/store';
 import { readPrefs } from '../logic/preferences';
-import { AppState, Day, DAYS, MatchRule, Member, Recipe, Vote } from '../types';
+import { AppState, Day, DAYS, ExtraGrocery, MEAL_SLOTS, MatchRule, MealSlot, Member, Recipe, Vote } from '../types';
 import { ensureSignedIn, supabase } from './supabase';
 
 export type Household = { id: string; name: string; inviteCode: string };
 
-type HouseholdRow = { id: string; name: string; invite_code: string; match_rule: MatchRule };
+type HouseholdRow = { id: string; name: string; invite_code: string; match_rule: MatchRule; plan_slots: MealSlot[] | null };
 type MemberRow = { id: string; name: string; avatar: string; is_kid: boolean; no_foods: string[]; prefs: unknown };
 type VoteRow = { member_id: string; recipe_id: string; vote: Vote };
 
@@ -29,6 +30,15 @@ const memberRow = (householdId: string, m: Member) => ({
   is_kid: m.isKid,
   no_foods: m.noFoods,
   prefs: m.prefs,
+});
+
+type PlanMealRow = { day: Day; slot: MealSlot; recipe_id: string | null };
+
+const planMealRow = (householdId: string, day: Day, slot: MealSlot, recipeId: string | null) => ({
+  household_id: householdId,
+  day,
+  slot,
+  recipe_id: recipeId,
 });
 
 /** Shows a code like "XP5 59S" so it is easier to read out loud. */
@@ -61,19 +71,21 @@ export async function leaveHousehold(householdId: string): Promise<void> {
 /** Everything the app shows for this family, read fresh from the server. */
 export async function fetchFamily(householdId: string): Promise<{ household: Household; state: AppState }> {
   const s = db();
-  const [h, members, recipes, votes, planDays, groceries] = await Promise.all([
-    s.from('households').select('id, name, invite_code, match_rule').eq('id', householdId).single<HouseholdRow>(),
+  const [h, members, recipes, votes, planMeals, groceries, extras] = await Promise.all([
+    s.from('households').select('id, name, invite_code, match_rule, plan_slots').eq('id', householdId).single<HouseholdRow>(),
     s.from('members').select('id, name, avatar, is_kid, no_foods, prefs').eq('household_id', householdId).order('created_at'),
     s.from('recipes').select('id, data').eq('household_id', householdId).order('position').order('created_at'),
     s.from('votes').select('member_id, recipe_id, vote').eq('household_id', householdId),
-    s.from('plan_days').select('day, recipe_id').eq('household_id', householdId),
+    s.from('plan_meals').select('day, slot, recipe_id').eq('household_id', householdId),
     s.from('grocery_checks').select('key').eq('household_id', householdId).eq('checked', true),
+    s.from('grocery_extras').select('id, name').eq('household_id', householdId).order('created_at'),
   ]);
   const household = check(h);
 
   const state: AppState = {
     ...initialState,
     matchRule: household.match_rule,
+    planSlots: household.plan_slots?.length ? MEAL_SLOTS.filter((m) => household.plan_slots!.includes(m)) : initialState.planSlots,
     members: (check(members) as MemberRow[]).map((m) => ({
       id: m.id,
       name: m.name,
@@ -85,8 +97,9 @@ export async function fetchFamily(householdId: string): Promise<{ household: Hou
     recipes: {},
     deckOrder: [],
     votes: {},
-    plan: { ...initialState.plan },
+    plan: emptyPlan(),
     checkedGroceries: (check(groceries) as { key: string }[]).map((g) => g.key),
+    extraGroceries: check(extras) as ExtraGrocery[],
   };
   for (const r of check(recipes) as { id: string; data: Recipe }[]) {
     state.recipes[r.id] = r.data;
@@ -95,15 +108,17 @@ export async function fetchFamily(householdId: string): Promise<{ household: Hou
   for (const v of check(votes) as VoteRow[]) {
     (state.votes[v.member_id] ??= {})[v.recipe_id] = v.vote;
   }
-  for (const p of check(planDays) as { day: Day; recipe_id: string | null }[]) {
-    state.plan[p.day] = p.recipe_id;
+  for (const p of check(planMeals) as PlanMealRow[]) {
+    if (state.plan[p.day]) state.plan[p.day][p.slot] = p.recipe_id;
   }
   return { household: toHousehold(household), state };
 }
 
 async function uploadAll(householdId: string, state: AppState) {
   const s = db();
-  check(await s.from('households').update({ match_rule: state.matchRule }).eq('id', householdId));
+  check(
+    await s.from('households').update({ match_rule: state.matchRule, plan_slots: state.planSlots }).eq('id', householdId),
+  );
   if (state.members.length) {
     check(await s.from('members').upsert(state.members.map((m) => memberRow(householdId, m))));
   }
@@ -115,8 +130,13 @@ async function uploadAll(householdId: string, state: AppState) {
       Object.entries(mine).map(([recipeId, vote]) => ({ household_id: householdId, member_id: memberId, recipe_id: recipeId, vote })),
     );
   if (votes.length) check(await s.from('votes').upsert(votes));
-  const days = DAYS.filter((d) => state.plan[d]).map((day) => ({ household_id: householdId, day, recipe_id: state.plan[day] }));
-  if (days.length) check(await s.from('plan_days').upsert(days));
+  const meals = DAYS.flatMap((day) =>
+    MEAL_SLOTS.filter((slot) => state.plan[day][slot]).map((slot) => planMealRow(householdId, day, slot, state.plan[day][slot])),
+  );
+  if (meals.length) check(await s.from('plan_meals').upsert(meals));
+  if (state.extraGroceries.length) {
+    check(await s.from('grocery_extras').upsert(state.extraGroceries.map((i) => ({ household_id: householdId, ...i }))));
+  }
   if (state.checkedGroceries.length) {
     check(
       await s.from('grocery_checks').upsert(state.checkedGroceries.map((key) => ({ household_id: householdId, key, checked: true }))),
@@ -181,14 +201,29 @@ export async function pushChange(householdId: string, action: Action, prev: AppS
         }),
       );
       return;
-    case 'setPlanDay':
-    case 'autofillPlan': {
-      const changed = DAYS.filter((d) => prev.plan[d] !== next.plan[d]);
+    case 'setPlanMeal':
+    case 'movePlanMeal':
+    case 'autofillPlan':
+    case 'clearPlan': {
+      const changed = changedSpots(prev.plan, next.plan);
       if (changed.length) {
-        check(await s.from('plan_days').upsert(changed.map((day) => ({ household_id: hid, day, recipe_id: next.plan[day] }))));
+        check(
+          await s
+            .from('plan_meals')
+            .upsert(changed.map(({ day, slot }) => planMealRow(hid, day, slot, next.plan[day][slot]))),
+        );
       }
       return;
     }
+    case 'setPlanSlots':
+      check(await s.from('households').update({ plan_slots: next.planSlots }).eq('id', hid));
+      return;
+    case 'addExtraGrocery':
+      check(await s.from('grocery_extras').upsert({ household_id: hid, ...action.item }));
+      return;
+    case 'removeExtraGrocery':
+      check(await s.from('grocery_extras').delete().eq('household_id', hid).eq('id', action.id));
+      return;
     case 'toggleGrocery':
       check(
         await s

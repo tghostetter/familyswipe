@@ -3,7 +3,8 @@
 // switch to a paid production key (or another service such as Spoonacular).
 // Everything that talks to the recipe service lives in this file, so swapping
 // services later only means changing this file.
-import { Ingredient, Recipe } from '../types';
+import { LUNCHBOX_RECIPES } from '../data/lunchbox';
+import { Ingredient, MealSlot, Recipe } from '../types';
 
 const BASE = 'https://www.themealdb.com/api/json/v1/1';
 
@@ -75,7 +76,7 @@ export type DeckOptions = {
  * Loads a batch of dinner recipes with photos. The best fits for the family come
  * first, with a few surprises mixed in so the deck doesn't get boring.
  */
-export async function fetchDinnerDeck(target = 40, { exclude, allowed, score }: DeckOptions = {}): Promise<Recipe[]> {
+async function fetchDinnerDeck(target = 40, { exclude, allowed, score }: DeckOptions = {}): Promise<Recipe[]> {
   const fresh = shuffle(await allDinners()).filter((r) => !exclude?.has(r.id) && (allowed?.(r) ?? true));
   if (!score) return fresh.slice(0, target);
   const ranked = fresh.map((r) => ({ r, s: score(r) }));
@@ -84,4 +85,58 @@ export async function fetchDinnerDeck(target = 40, { exclude, allowed, score }: 
   // About one card in five is something new to try.
   const surprises = Math.min(others.length, Math.max(target - favorites.length, Math.round(target / 5)));
   return shuffle([...favorites.slice(0, target - surprises), ...others.slice(0, surprises)]);
+}
+
+async function getMeals(path: string): Promise<MealDbMeal[]> {
+  const res = await fetch(`${BASE}/${path}`);
+  if (!res.ok) throw new Error(`Recipe service returned ${res.status}`);
+  const json: { meals: MealDbMeal[] | null } = await res.json();
+  return json.meals ?? [];
+}
+
+// Breakfast-y searches, on top of TheMealDB's own Breakfast category.
+const BREAKFAST_SEARCHES = ['pancake', 'french toast', 'waffle', 'omelette', 'porridge', 'muffin', 'crepe', 'frittata', 'shakshuka'];
+
+let breakfasts: Promise<Recipe[]> | null = null;
+
+/**
+ * Every breakfast we can find, loaded once per app launch. Ids get a "breakfast-"
+ * prefix so a dish that is also in the dinner deck gets its own swipes and matches.
+ */
+function allBreakfasts(): Promise<Recipe[]> {
+  breakfasts ??= (async () => {
+    const ids = (await getMeals('filter.php?c=Breakfast')).map((m) => m.idMeal).filter((id): id is string => !!id);
+    const [category, searches] = await Promise.all([
+      Promise.all(ids.map((id) => getMeals(`lookup.php?i=${id}`).catch(() => []))),
+      Promise.all(BREAKFAST_SEARCHES.map((q) => getMeals(`search.php?s=${encodeURIComponent(q)}`).catch(() => []))),
+    ]);
+    const found = new Map<string, Recipe>();
+    for (const recipe of [...category.flat(), ...searches.flat()].map(toRecipe)) {
+      if (recipe.id && recipe.image) {
+        found.set(recipe.id, { ...recipe, id: `breakfast-${recipe.id}`, mealType: 'breakfast' });
+      }
+    }
+    return [...found.values()];
+  })().catch((e) => {
+    breakfasts = null; // try again next time
+    throw e;
+  });
+  return breakfasts;
+}
+
+/**
+ * Loads a batch of recipes with photos for one meal. Food preferences (loved
+ * cuisines and kinds of dinner) only rank dinners; "never eats" applies to all.
+ */
+export async function fetchDeck(mealType: MealSlot, options: DeckOptions = {}): Promise<Recipe[]> {
+  const { exclude, allowed } = options;
+  const keep = (r: Recipe) => !exclude?.has(r.id) && (allowed?.(r) ?? true);
+  switch (mealType) {
+    case 'breakfast':
+      return shuffle((await allBreakfasts()).filter(keep));
+    case 'lunch':
+      return shuffle(LUNCHBOX_RECIPES.filter(keep));
+    case 'dinner':
+      return (await fetchDinnerDeck(40, options)).map((r) => ({ ...r, mealType: 'dinner' }));
+  }
 }

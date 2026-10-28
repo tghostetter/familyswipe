@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { fetchDinnerDeck } from '../api/recipes';
+import { fetchDeck } from '../api/recipes';
 import { AddRecipeSheet } from '../components/AddRecipeSheet';
 import { MatchModal } from '../components/MatchModal';
+import { MealTypePicker } from '../components/MealTypePicker';
 import { RecipeDetail } from '../components/RecipeDetail';
 import { SwipeDeck } from '../components/SwipeDeck';
-import { deckFor, isBlocked, isMatch, likersOf } from '../logic/matching';
+import { deckFor, hasDeck, isBlocked, isMatch, likersOf, mealTypeInfo } from '../logic/matching';
 import { familyScore, hasAnyLikes } from '../logic/preferences';
 import { useStore } from '../state/store';
 import { colors, radius } from '../theme';
-import { Recipe, Vote } from '../types';
+import { MealSlot, Recipe, Vote } from '../types';
 
 export function SwipeScreen() {
   const { state, dispatch, household, myMemberId, setMyMemberId } = useStore();
@@ -20,8 +21,21 @@ export function SwipeScreen() {
     if (household && id) setMyMemberId(id);
   };
   const switchLabel = household ? 'Switch person' : 'Pass the phone';
+  const [mealType, setMealTypeState] = useState<MealSlot>('dinner');
+  const meal = mealTypeInfo(mealType);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Meals with nothing new left to load (the breakfast and lunchbox lists are short).
+  const [allLoaded, setAllLoaded] = useState<Partial<Record<MealSlot, boolean>>>({});
+  const outOfRecipes =
+    mealType === 'dinner'
+      ? "We've run out of dinners that fit everyone's food preferences. You can loosen them on the Family tab."
+      : `That's every one of the ${meal.plural} that fit everyone's food preferences for now.`;
+  const setMealType = (next: MealSlot) => {
+    setMealTypeState(next);
+    setError(null);
+    setAdded(null);
+  };
   const [matched, setMatched] = useState<Recipe | null>(null);
   const [open, setOpen] = useState<Recipe | null>(null);
   const [adding, setAdding] = useState(false);
@@ -30,6 +44,7 @@ export function SwipeScreen() {
   const addSheet = (
     <AddRecipeSheet
       visible={adding}
+      mealType={mealType}
       onClose={() => setAdding(false)}
       onAdded={(r) => setAdded(`Added "${r.name}" to the top of the deck.`)}
     />
@@ -41,7 +56,8 @@ export function SwipeScreen() {
   );
 
   const swiper = state.members.find((m) => m.id === swiperId) ?? null;
-  const deck = useMemo(() => (swiper ? deckFor(state, swiper.id) : []), [state, swiper]);
+  const deck = useMemo(() => (swiper ? deckFor(state, swiper.id, mealType) : []), [state, swiper, mealType]);
+  const needsDeck = !hasDeck(state, mealType);
 
   // Latest family and deck, read when loading so loadMore doesn't change on every swipe.
   const stateRef = useRef(state);
@@ -52,13 +68,13 @@ export function SwipeScreen() {
     setError(null);
     try {
       const { members, deckOrder } = stateRef.current;
-      const recipes = await fetchDinnerDeck(40, {
+      const recipes = await fetchDeck(mealType, {
         exclude: new Set(deckOrder),
         allowed: (r) => !isBlocked(members, r),
         score: hasAnyLikes(members) ? (r) => familyScore(members, r) : undefined,
       });
       if (recipes.length === 0) {
-        setError("We've run out of dinners that fit everyone's food preferences. You can loosen them on the Family tab.");
+        setAllLoaded((done) => ({ ...done, [mealType]: true }));
         return;
       }
       dispatch({ type: 'addRecipes', recipes });
@@ -67,11 +83,11 @@ export function SwipeScreen() {
     } finally {
       setLoading(false);
     }
-  }, [dispatch]);
+  }, [dispatch, mealType]);
 
   useEffect(() => {
-    if (state.deckOrder.length === 0 && !loading && !error) loadMore();
-  }, [state.deckOrder.length, loading, error, loadMore]);
+    if (needsDeck && !allLoaded[mealType] && !loading && !error) loadMore();
+  }, [needsDeck, allLoaded, mealType, loading, error, loadMore]);
 
   const handleVote = (recipe: Recipe, vote: Vote) => {
     if (!swiper) return;
@@ -84,6 +100,7 @@ export function SwipeScreen() {
   if (!swiper) {
     return (
       <ScrollView contentContainerStyle={styles.pickWrap}>
+        <MealTypePicker value={mealType} onChange={setMealType} />
         <Text style={styles.h1}>Who's swiping?</Text>
         <Text style={styles.sub}>
           {household
@@ -92,7 +109,7 @@ export function SwipeScreen() {
         </Text>
         <View style={styles.grid}>
           {state.members.map((m) => {
-            const left = deckFor(state, m.id).length;
+            const left = deckFor(state, m.id, mealType).length;
             return (
               <Pressable
                 key={m.id}
@@ -136,25 +153,36 @@ export function SwipeScreen() {
           <Text style={styles.added}>{added}</Text>
         </Pressable>
       )}
+      <MealTypePicker value={mealType} onChange={setMealType} />
 
       {deck.length > 0 ? (
         <SwipeDeck recipes={deck} kidMode={swiper.isKid} onVote={handleVote} onOpen={setOpen} />
+      ) : needsDeck && !allLoaded[mealType] ? (
+        <View style={styles.done}>
+          {error ? <ErrorBox message={error} onRetry={loadMore} /> : <ActivityIndicator color={colors.basil} />}
+        </View>
       ) : (
         <View style={styles.done}>
           <Text style={styles.doneEmoji}>🎉</Text>
-          <Text style={styles.h1}>You swiped them all, {swiper.name}!</Text>
+          <Text style={styles.h1}>
+            You swiped all the {meal.plural}, {swiper.name}!
+          </Text>
           <Text style={styles.sub}>
             {household
-              ? "Your family's matches show up as everyone finishes swiping. Want more? Load more dinners."
-              : 'Pass the phone to the next person, or load more dinners.'}
+              ? "Your family's matches show up as everyone finishes swiping. Try another meal up top, or load more."
+              : 'Pass the phone to the next person, try another meal up top, or load more.'}
           </Text>
           {error && <ErrorBox message={error} onRetry={loadMore} />}
           <Pressable style={styles.primary} onPress={() => setSwiperId(null)}>
             <Text style={styles.primaryText}>{switchLabel}</Text>
           </Pressable>
-          <Pressable style={styles.secondary} onPress={loadMore} disabled={loading}>
-            <Text style={styles.secondaryText}>{loading ? 'Loading…' : 'Load more dinners'}</Text>
-          </Pressable>
+          {allLoaded[mealType] ? (
+            <Text style={styles.sub}>{outOfRecipes}</Text>
+          ) : (
+            <Pressable style={styles.secondary} onPress={loadMore} disabled={loading}>
+              <Text style={styles.secondaryText}>{loading ? 'Loading…' : `Load more ${meal.plural}`}</Text>
+            </Pressable>
+          )}
           {addButton}
         </View>
       )}

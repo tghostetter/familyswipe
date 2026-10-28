@@ -14,6 +14,7 @@ import Animated, {
 import { scheduleOnRN } from 'react-native-worklets';
 import { siteName } from '../api/importRecipe';
 import { estimateNutrition } from '../logic/nutrition';
+import { photoFit } from '../logic/matching';
 import { colors, radius } from '../theme';
 import { Recipe, Vote } from '../types';
 import { NutritionLine } from './Nutrition';
@@ -128,13 +129,13 @@ export function SwipeDeck({ recipes, kidMode, onVote, onOpen }: Props) {
       <View style={styles.stack}>
         {next && (
           <Animated.View style={[styles.card, behindStyle]}>
-            <Image source={next.image} style={styles.photo} contentFit="cover" />
+            <Image source={next.image} style={styles.photo} contentFit={photoFit(next)} />
           </Animated.View>
         )}
         <GestureDetector gesture={pan}>
             <Animated.View style={[styles.card, cardStyle]}>
             <Pressable style={{ flex: 1 }} onPress={() => onOpen(top)}>
-              <Image source={top.image} style={styles.photo} contentFit="cover" transition={150} />
+              <Image source={top.image} style={styles.photo} contentFit={photoFit(top)} transition={150} />
               <View style={styles.caption}>
                 <Text style={[styles.name, kidMode && styles.nameKid]} numberOfLines={2}>
                   {top.name}

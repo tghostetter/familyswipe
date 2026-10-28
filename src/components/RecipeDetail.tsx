@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
-import { Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { siteName } from '../api/importRecipe';
+import { photoFit } from '../logic/matching';
 import { estimateNutrition } from '../logic/nutrition';
 import { colors, radius } from '../theme';
 import { Recipe } from '../types';
@@ -16,15 +16,10 @@ export function RecipeDetail({ recipe, onClose }: Props) {
       {recipe && (
         <View style={{ flex: 1, backgroundColor: colors.bg }}>
           <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
-            <Image source={recipe.image} style={styles.photo} contentFit="cover" />
+            <Image source={recipe.image} style={styles.photo} contentFit={photoFit(recipe)} />
             <View style={styles.body}>
               <Text style={styles.name}>{recipe.name}</Text>
               <Text style={styles.meta}>{[recipe.cuisine, recipe.category].filter(Boolean).join(' · ')}</Text>
-              {recipe.sourceUrl && (
-                <Pressable onPress={() => Linking.openURL(recipe.sourceUrl!).catch(() => {})} accessibilityRole="link">
-                  <Text style={styles.source}>🔗 From {siteName(recipe.sourceUrl)} · Open the full recipe</Text>
-                </Pressable>
-              )}
 
               <Text style={styles.h}>Nutrition</Text>
               <NutritionPanel n={estimateNutrition(recipe)} />
@@ -37,7 +32,7 @@ export function RecipeDetail({ recipe, onClose }: Props) {
                 </View>
               ))}
 
-              <Text style={styles.h}>Steps</Text>
+              <Text style={styles.h}>{recipe.mealType === 'lunch' ? 'Packing tips' : 'Steps'}</Text>
               {recipe.instructions
                 .split(/\r?\n+/)
                 .map((s) => s.trim())
@@ -63,7 +58,6 @@ const styles = StyleSheet.create({
   body: { padding: 20, gap: 8 },
   name: { fontSize: 28, fontWeight: '800', color: colors.text },
   meta: { fontSize: 15, color: colors.muted },
-  source: { fontSize: 15, fontWeight: '700', color: colors.basil },
   h: { fontSize: 13, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', color: colors.basil, marginTop: 18 },
   ingRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.line },
   ingName: { fontSize: 16, color: colors.text, flexShrink: 1 },
