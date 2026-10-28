@@ -2,6 +2,7 @@ import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef } from 'react';
 import { Animated, Dimensions, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
+import { siteName } from '../api/importRecipe';
 import { colors, radius } from '../theme';
 import { Recipe, Vote } from '../types';
 
@@ -82,7 +83,7 @@ export function SwipeDeck({ recipes, kidMode, onVote, onOpen }: Props) {
               </Text>
               {!kidMode && (
                 <Text style={styles.meta}>
-                  {[top.cuisine, top.category, `${top.ingredients.length} ingredients`].filter(Boolean).join(' · ')}
+                  {[top.sourceUrl ? `🔗 ${siteName(top.sourceUrl)}` : '', top.cuisine, top.category, `${top.ingredients.length} ingredients`].filter(Boolean).join(' · ')}
                   {'  ·  Tap for recipe'}
                 </Text>
               )}

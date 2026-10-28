@@ -1,4 +1,4 @@
--- FamilySwipe: shared family households.
+-- Kitchen Cupid: shared family households.
 -- Paste this whole file into the Supabase SQL Editor and press Run. It is safe to run again.
 --
 -- How it fits together:

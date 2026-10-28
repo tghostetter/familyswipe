@@ -27,7 +27,7 @@ export function WelcomeScreen() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.wrap} keyboardShouldPersistTaps="handled">
         <Text style={styles.hero}>🍽️</Text>
-        <Text style={styles.h1}>Welcome to FamilySwipe</Text>
+        <Text style={styles.h1}>Welcome to Kitchen Cupid</Text>
         <Text style={styles.sub}>Everyone swipes on dinners from their own phone or tablet. When enough of you say yum, it's a match.</Text>
 
         <View style={styles.card}>

@@ -170,6 +170,17 @@ export async function pushChange(householdId: string, action: Action, prev: AppS
     case 'addRecipes':
       await upsertRecipes(hid, action.recipes, next.deckOrder);
       return;
+    case 'importRecipe':
+      // Newest imports get the lowest position, so they sort to the top of the deck on every device.
+      check(
+        await s.from('recipes').upsert({
+          household_id: hid,
+          id: action.recipe.id,
+          data: action.recipe,
+          position: -Math.floor(Date.now() / 1000),
+        }),
+      );
+      return;
     case 'setPlanDay':
     case 'autofillPlan': {
       const changed = DAYS.filter((d) => prev.plan[d] !== next.plan[d]);

@@ -49,7 +49,7 @@ export function FamilyScreen({ onDone }: { onDone: () => void }) {
   const shareCode = () => {
     if (!household) return;
     Share.share({
-      message: `Join our family on FamilySwipe so we can pick dinners together! Open the app, tap "Join your family" and type this code: ${formatCode(household.inviteCode)}`,
+      message: `Join our family on Kitchen Cupid so we can pick dinners together! Open the app, tap "Join your family" and type this code: ${formatCode(household.inviteCode)}`,
     }).catch(() => {});
   };
 
@@ -83,7 +83,7 @@ export function FamilyScreen({ onDone }: { onDone: () => void }) {
           <Text style={styles.label}>{household.name}: family code</Text>
           <Text style={styles.code}>{formatCode(household.inviteCode)}</Text>
           <Text style={styles.help}>
-            To add a phone or tablet (Grandpa's phone, a kid's iPad or Kindle), open FamilySwipe on it, tap "Join your
+            To add a phone or tablet (Grandpa's phone, a kid's iPad or Kindle), open Kitchen Cupid on it, tap "Join your
             family" and type this code.
           </Text>
           <Pressable onPress={shareCode} style={styles.secondary}>

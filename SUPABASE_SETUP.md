@@ -10,7 +10,7 @@ Until you do this, the app keeps working the old way, on one shared phone.
 
 1. Go to https://supabase.com and click **Start your project**. Sign up (signing in with GitHub is easiest).
 2. Click **New project**.
-   - **Name:** `familyswipe`
+   - **Name:** `kitchen-cupid`
    - **Database password:** click **Generate a password**. You won't need it for the app, but save it in your password manager.
    - **Region:** pick the one closest to you (for example *East US*).
    - Plan: **Free** is plenty.
@@ -37,7 +37,7 @@ This is what lets kids join without an email address.
 2. You need two values:
    - The **Project URL**, which looks like `https://abcdefghijkl.supabase.co`
    - The **publishable key** (starts with `sb_publishable_`), or on older projects the **anon public** key (a long string starting with `eyJ`). Do **not** use the secret / service_role key.
-3. In the familyswipe folder on your Mac, run this in Terminal to make your own settings file:
+3. In the `familyswipe-family` folder on your Mac, run this in Terminal to make your own settings file:
    ```
    cp .env.example .env.local
    open -e .env.local
@@ -57,7 +57,7 @@ This is what lets kids join without an email address.
    ```
 2. On your phone, the app now opens on a **Welcome** screen. Tap **Start a family**. The family you already set up on this phone comes along.
 3. Go to the **Family** tab. You'll see your **family code**, like `XP5 59S`. Tap **Send the code** to text it to the family.
-4. On a second device (your wife's phone, an iPad, or the iOS Simulator), open the app in Expo Go the same way, tap **Join your family**, and type the code.
+4. On a second device (your wife's phone, an iPad, or the iOS Simulator), open Kitchen Cupid in Expo Go the same way, tap **Join your family**, and type the code.
 5. On each device, go to **Swipe** and tap your own name. The device remembers you after that. On a shared kids' iPad, tap **Switch person** to change who's swiping.
 
 Swipes show up on the other devices within a second or two. When enough of you say yum, the dinner appears on everyone's **Matches** tab.
