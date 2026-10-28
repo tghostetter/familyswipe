@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { RecipeDetail } from '../components/RecipeDetail';
-import { likersOf, matchedRecipeIds, MATCH_RULES } from '../logic/matching';
+import { likersOf, matchedRecipeIds, MATCH_RULES, MIN_LIKERS } from '../logic/matching';
 import { useStore } from '../state/store';
 import { colors, radius } from '../theme';
 import { DAYS, Recipe } from '../types';
@@ -33,7 +33,11 @@ export function MatchesScreen() {
           </View>
         }
         ListEmptyComponent={
-          <Text style={styles.empty}>No matches yet. Once the family has swiped, dinners you agree on show up here.</Text>
+          <Text style={styles.empty}>
+            {state.members.length < MIN_LIKERS
+              ? 'A match needs at least two people saying yum. Add another family member on the Family tab, or have them join from their own phone.'
+              : 'No matches yet. Once the family has swiped, dinners you agree on show up here.'}
+          </Text>
         }
         renderItem={({ item: id }) => {
           const r = state.recipes[id];
