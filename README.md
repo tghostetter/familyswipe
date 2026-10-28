@@ -1,4 +1,4 @@
-# FamilySwipe (working name)
+# Kitchen Cupid
 
 A family dinner app: everyone swipes on recipes, and when enough of the family says "yum" it's a match. Matches turn into the week's dinner plan and a grocery list.
 
@@ -55,6 +55,6 @@ TestFlight installs a real copy of the app on your phone, with no computer neede
    - Answer yes when it asks to create the project and to sign in to your Apple account.
    - Let it create the certificates and the App Store Connect app for you.
 4. The build runs in the cloud (about 15 to 30 minutes). Then it uploads to App Store Connect, and Apple processes it (another 10 to 30 minutes).
-5. Install the **TestFlight** app on your iPhone. Sign in with the same Apple ID, and FamilySwipe shows up there.
+5. Install the **TestFlight** app on your iPhone. Sign in with the same Apple ID, and Kitchen Cupid shows up there.
 
 To add family testers, open App Store Connect, go to your app, then TestFlight, then Internal Testing, and add their Apple IDs.

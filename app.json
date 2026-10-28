@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "FamilySwipe",
-    "slug": "familyswipe",
+    "name": "Kitchen Cupid",
+    "slug": "kitchencupid",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.tghostetter.familyswipe",
+      "bundleIdentifier": "com.tghostetter.kitchencupid",
       "config": {
         "usesNonExemptEncryption": false
       }
@@ -21,7 +21,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.tghostetter.familyswipe"
+      "package": "com.tghostetter.kitchencupid"
     },
     "web": {
       "favicon": "./assets/favicon.png"
