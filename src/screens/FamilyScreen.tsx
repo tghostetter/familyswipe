@@ -147,7 +147,7 @@ export function FamilyScreen({ onDone }: { onDone: () => void }) {
             />
           </View>
           <Text style={[styles.h2, { marginTop: 8 }]}>Food preferences</Text>
-          <Text style={styles.help}>All optional. FamilySwipe shows the dinners your family likes most first.</Text>
+          <Text style={styles.help}>All optional. Kitchen Cupid shows the dinners your family likes most first.</Text>
 
           <Text style={styles.label}>Favorite kinds of dinner</Text>
           <View style={styles.chips}>
