@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RecipeDetail } from '../components/RecipeDetail';
-import { matchedRecipeIds } from '../logic/matching';
+import { matchedRecipeIds, photoFit } from '../logic/matching';
 import { DAY_NAMES, plannedIds, SLOT_ICONS, SLOT_NAMES, spareMatches } from '../logic/plan';
 import { useStore } from '../state/store';
 import { colors, radius } from '../theme';
@@ -94,7 +94,7 @@ export function PlanScreen() {
                 accessibilityLabel={r ? `${SLOT_NAMES[slot]} on ${DAY_NAMES[day]}: ${r.name}. Tap to change.` : `Add ${SLOT_NAMES[slot]} on ${DAY_NAMES[day]}`}
               >
                 {r ? (
-                  <Image source={r.image} style={styles.thumb} contentFit="cover" />
+                  <Image source={r.image} style={styles.thumb} contentFit={photoFit(r)} />
                 ) : (
                   <View style={[styles.thumb, styles.thumbEmpty]}>
                     <Text style={{ fontSize: 22 }}>{SLOT_ICONS[slot]}</Text>
@@ -256,7 +256,7 @@ function MatchPicker(props: {
             }
             renderItem={({ item: r }) => (
               <Pressable style={styles.pickRow} onPress={() => props.onPick(r.id)}>
-                <Image source={r.image} style={styles.thumb} contentFit="cover" />
+                <Image source={r.image} style={styles.thumb} contentFit={photoFit(r)} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.mealName} numberOfLines={2}>
                     {r.name}
