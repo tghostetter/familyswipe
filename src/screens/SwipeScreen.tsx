@@ -10,8 +10,14 @@ import { colors, radius } from '../theme';
 import { Recipe, Vote } from '../types';
 
 export function SwipeScreen() {
-  const { state, dispatch } = useStore();
-  const [swiperId, setSwiperId] = useState<string | null>(null);
+  const { state, dispatch, household, myMemberId, setMyMemberId } = useStore();
+  // On a family device, open straight to whoever swiped here last.
+  const [swiperId, setSwiperIdState] = useState<string | null>(household ? myMemberId : null);
+  const setSwiperId = (id: string | null) => {
+    setSwiperIdState(id);
+    if (household && id) setMyMemberId(id);
+  };
+  const switchLabel = household ? 'Switch person' : 'Pass the phone';
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [matched, setMatched] = useState<Recipe | null>(null);
@@ -48,7 +54,11 @@ export function SwipeScreen() {
     return (
       <ScrollView contentContainerStyle={styles.pickWrap}>
         <Text style={styles.h1}>Who's swiping?</Text>
-        <Text style={styles.sub}>Pass the phone around. Each person swipes on their own.</Text>
+        <Text style={styles.sub}>
+          {household
+            ? 'Tap your name. This phone or tablet will remember you next time.'
+            : 'Pass the phone around. Each person swipes on their own.'}
+        </Text>
         <View style={styles.grid}>
           {state.members.map((m) => {
             const left = deckFor(state, m.id).length;
@@ -79,7 +89,7 @@ export function SwipeScreen() {
           {swiper.isKid ? '  ·  Kid mode' : ''}
         </Text>
         <Pressable onPress={() => setSwiperId(null)} style={styles.passBtn}>
-          <Text style={styles.passText}>Pass the phone</Text>
+          <Text style={styles.passText}>{switchLabel}</Text>
         </Pressable>
       </View>
 
@@ -89,10 +99,14 @@ export function SwipeScreen() {
         <View style={styles.done}>
           <Text style={styles.doneEmoji}>🎉</Text>
           <Text style={styles.h1}>You swiped them all, {swiper.name}!</Text>
-          <Text style={styles.sub}>Pass the phone to the next person, or load more dinners.</Text>
+          <Text style={styles.sub}>
+            {household
+              ? "Your family's matches show up as everyone finishes swiping. Want more? Load more dinners."
+              : 'Pass the phone to the next person, or load more dinners.'}
+          </Text>
           {error && <ErrorBox message={error} onRetry={loadMore} />}
           <Pressable style={styles.primary} onPress={() => setSwiperId(null)}>
-            <Text style={styles.primaryText}>Pass the phone</Text>
+            <Text style={styles.primaryText}>{switchLabel}</Text>
           </Pressable>
           <Pressable style={styles.secondary} onPress={loadMore} disabled={loading}>
             <Text style={styles.secondaryText}>{loading ? 'Loading…' : 'Load more dinners'}</Text>

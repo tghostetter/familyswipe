@@ -2,7 +2,7 @@
 
 A family dinner app: everyone swipes on recipes, and when enough of the family says "yum" it's a match. Matches turn into the week's dinner plan and a grocery list.
 
-This is the first version. It runs on one shared phone that the family passes around. Syncing across several phones comes next.
+Each person can swipe on their own phone or tablet: everyone joins the same family with a 6-letter code. To turn that on, follow [SUPABASE_SETUP.md](SUPABASE_SETUP.md) (about 10 minutes, free). Until then, the app runs on one shared phone that the family passes around.
 
 ## Try it on your iPhone
 
@@ -23,8 +23,8 @@ Changes to the code show up on the phone right away while `npx expo start` is ru
 
 | Tab | What it does |
 | --- | --- |
-| Family | Add family members, mark kids, pick avatars, list foods someone never eats, choose what counts as a match, start a new week |
-| Swipe | "Who's swiping?" then swipe right (yum) or left (nope). Kids get big photos and Yum / Yuck buttons. Tap a card to see the recipe |
+| Family | Shows your family code for adding phones and tablets. Add family members, mark kids, pick avatars, list foods someone never eats, choose what counts as a match, start a new week |
+| Swipe | Tap your name (each device remembers you), then swipe right (yum) or left (nope). Kids get big photos and Yum / Yuck buttons. Tap a card to see the recipe |
 | Matches | Dinners the family agreed on. "Add" puts one on the next empty night |
 | Plan | Monday to Sunday. "Fill empty nights" uses your matches |
 | Groceries | Every ingredient for the planned dinners, combined, with check boxes |
@@ -37,7 +37,10 @@ Changes to the code show up on the phone right away while `npx expo start` is ru
 - `src/logic/matching.ts`: the match rules (everyone, majority, parents plus a kid)
 - `src/logic/grocery.ts`: builds the grocery list
 - `src/api/recipes.ts`: loads recipes and photos from TheMealDB
-- `src/state/store.tsx`: saves everything on the phone
+- `src/state/store.tsx`: keeps the app's data on the phone and sends changes to the family
+- `src/sync/`: talks to Supabase (joining a family, saving swipes, live updates)
+- `src/screens/WelcomeScreen.tsx`: "Start a family" or "Join your family"
+- `supabase/schema.sql`: the database tables, pasted into Supabase once
 
 ## Before the App Store
 

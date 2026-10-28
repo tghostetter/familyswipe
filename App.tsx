@@ -8,7 +8,9 @@ import { GroceryScreen } from './src/screens/GroceryScreen';
 import { MatchesScreen } from './src/screens/MatchesScreen';
 import { PlanScreen } from './src/screens/PlanScreen';
 import { SwipeScreen } from './src/screens/SwipeScreen';
+import { WelcomeScreen } from './src/screens/WelcomeScreen';
 import { StoreProvider, useStore } from './src/state/store';
+import { syncEnabled } from './src/sync/supabase';
 import { colors } from './src/theme';
 
 type Tab = 'swipe' | 'matches' | 'plan' | 'grocery' | 'family';
@@ -33,7 +35,7 @@ export default function App() {
 }
 
 function Main() {
-  const { state, ready } = useStore();
+  const { state, ready, household, syncError } = useStore();
   const [tab, setTab] = useState<Tab>('swipe');
   const noFamily = state.members.length === 0;
 
@@ -49,10 +51,19 @@ function Main() {
     );
   }
 
+  if (syncEnabled && !household) {
+    return (
+      <SafeAreaView style={styles.root}>
+        <WelcomeScreen />
+      </SafeAreaView>
+    );
+  }
+
   const matchCount = matchedRecipeIds(state).length;
 
   return (
     <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
+      {syncError && <Text style={styles.syncError}>{syncError}</Text>}
       <View style={{ flex: 1 }}>
         {tab === 'swipe' && <SwipeScreen />}
         {tab === 'matches' && <MatchesScreen />}
@@ -91,4 +102,5 @@ const styles = StyleSheet.create({
   tabLabelOn: { color: colors.basil },
   badge: { position: 'absolute', top: 4, right: '22%', backgroundColor: colors.match, borderRadius: 9, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+  syncError: { backgroundColor: colors.matchSoft, color: colors.text, fontSize: 13, paddingHorizontal: 16, paddingVertical: 8, textAlign: 'center' },
 });
