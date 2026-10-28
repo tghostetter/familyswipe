@@ -1,4 +1,4 @@
-# FamilySwipe (working name)
+# Kitchen Cupid
 
 A family dinner app: everyone swipes on recipes, and when enough of the family says "yum" it's a match. Matches turn into the week's dinner plan and a grocery list.
 
