@@ -1,5 +1,8 @@
 import { AppState, MatchRule, Member, Recipe } from '../types';
 
+/** Fewest people who must say yum before anything counts as a match. */
+export const MIN_LIKERS = 2;
+
 export const MATCH_RULES: { value: MatchRule; label: string; help: string }[] = [
   { value: 'everyone', label: 'Everyone', help: 'A match needs a "yum" from every family member.' },
   { value: 'majority', label: 'Majority', help: 'A match needs a "yum" from more than half the family.' },
@@ -21,13 +24,14 @@ export function isMatch(
   const { members, matchRule } = state;
   if (members.length === 0) return false;
   const likers = new Set(likersOf(state, recipeId).map((m) => m.id));
-  if (likers.size === 0) return false;
+  // A match always takes at least two people saying yum, whatever the rule.
+  if (likers.size < MIN_LIKERS) return false;
 
   switch (matchRule) {
     case 'everyone':
       return members.every((m) => likers.has(m.id));
     case 'majority':
-      // A family of one or two still needs everyone.
+      // A family of two still needs both.
       return members.length <= 2
         ? members.every((m) => likers.has(m.id))
         : likers.size > members.length / 2;

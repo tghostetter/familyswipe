@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { MATCH_RULES } from '../logic/matching';
 import { newId, useStore } from '../state/store';
+import { formatCode } from '../sync/household';
 import { AVATARS, colors, radius } from '../theme';
 import { Member } from '../types';
 
@@ -10,7 +11,7 @@ type Draft = { id: string | null; name: string; avatar: string; isKid: boolean; 
 const blankDraft = (avatar: string): Draft => ({ id: null, name: '', avatar, isKid: false, noFoods: '' });
 
 export function FamilyScreen({ onDone }: { onDone: () => void }) {
-  const { state, dispatch } = useStore();
+  const { state, dispatch, household, leaveFamily } = useStore();
   const [draft, setDraft] = useState<Draft | null>(state.members.length === 0 ? blankDraft(AVATARS[0]) : null);
 
   const save = () => {
@@ -41,6 +42,23 @@ export function FamilyScreen({ onDone }: { onDone: () => void }) {
       { text: 'Start new week', style: 'destructive', onPress: () => dispatch({ type: 'newWeek' }) },
     ]);
 
+  const shareCode = () => {
+    if (!household) return;
+    Share.share({
+      message: `Join our family on Kitchen Cupid so we can pick dinners together! Open the app, tap "Join your family" and type this code: ${formatCode(household.inviteCode)}`,
+    }).catch(() => {});
+  };
+
+  const leave = () =>
+    Alert.alert('Leave this family on this device?', 'Your family keeps everything. You can join again any time with the family code.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Leave',
+        style: 'destructive',
+        onPress: () => leaveFamily().catch(() => Alert.alert("Couldn't leave", 'Check your internet connection and try again.')),
+      },
+    ]);
+
   const nextAvatar = AVATARS[state.members.length % AVATARS.length];
 
   return (
@@ -49,9 +67,24 @@ export function FamilyScreen({ onDone }: { onDone: () => void }) {
         <View style={styles.welcome}>
           <Text style={styles.welcomeTitle}>Welcome! Let's set up your family.</Text>
           <Text style={styles.welcomeText}>
-            Add everyone who eats dinner at your house, kids too. Then pass the phone around and swipe on dinners. When
-            enough of you say yum, it's a match.
+            {household
+              ? "Add everyone who eats dinner at your house, kids too. Then each person swipes on their own phone or tablet (or you pass one around). When enough of you say yum, it's a match."
+              : "Add everyone who eats dinner at your house, kids too. Then pass the phone around and swipe on dinners. When enough of you say yum, it's a match."}
           </Text>
+        </View>
+      )}
+
+      {household && (
+        <View style={styles.codeCard}>
+          <Text style={styles.label}>{household.name}: family code</Text>
+          <Text style={styles.code}>{formatCode(household.inviteCode)}</Text>
+          <Text style={styles.help}>
+            To add a phone or tablet (Grandpa's phone, a kid's iPad or Kindle), open Kitchen Cupid on it, tap "Join your
+            family" and type this code.
+          </Text>
+          <Pressable onPress={shareCode} style={styles.secondary}>
+            <Text style={styles.secondaryText}>Send the code</Text>
+          </Pressable>
         </View>
       )}
 
@@ -160,12 +193,20 @@ export function FamilyScreen({ onDone }: { onDone: () => void }) {
           <Text style={[styles.secondaryText, { color: colors.match }]}>Start a new week</Text>
         </Pressable>
       )}
+
+      {household && (
+        <Pressable onPress={leave} style={styles.secondary}>
+          <Text style={[styles.secondaryText, { color: colors.muted, fontSize: 14 }]}>Leave this family on this device</Text>
+        </Pressable>
+      )}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: { padding: 16, gap: 10, paddingBottom: 40 },
+  codeCard: { backgroundColor: colors.surface, borderRadius: radius.md, padding: 16, gap: 6, borderWidth: 2, borderColor: colors.basil, alignItems: 'center' },
+  code: { fontSize: 40, fontWeight: '800', letterSpacing: 6, color: colors.basil },
   welcome: { backgroundColor: colors.basilSoft, borderRadius: radius.md, padding: 16, gap: 6 },
   welcomeTitle: { fontSize: 20, fontWeight: '800', color: colors.basil },
   welcomeText: { fontSize: 15, lineHeight: 22, color: colors.text },
